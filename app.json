@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "truck-operation-app",
+    "name": "トラック運行管理",
     "slug": "truck-operation-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,21 +10,46 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#1a3a5c"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.asayama.truckoperationapp",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "運行中のGPS位置情報を記録するために使用します。",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "バックグラウンドでもGPS位置情報を記録するために使用します。",
+        "NSLocationAlwaysUsageDescription": "バックグラウンドでもGPS位置情報を記録するために使用します。",
+        "UIBackgroundModes": ["location", "fetch"]
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#1a3a5c"
       },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ],
+      "package": "com.asayama.truckoperationapp",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "バックグラウンドでもGPS位置情報を記録するために使用します。",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ]
+    ]
   }
 }
