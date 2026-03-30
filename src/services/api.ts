@@ -218,17 +218,29 @@ export async function registerFace(faceImageBase64: string) {
   });
 }
 
-/** 顔認証を実行する（出発打刻前の本人確認） */
-export async function verifyFace(faceImageBase64: string) {
+/**
+ * 顔認証を実行する（ライブネス検知付き）
+ * @param faceImageBase64 正面顔画像（Base64）
+ * @param challengeTypes  実施したチャレンジの種類リスト
+ * @param allImagesBase64 全ステップの撮影画像リスト（ライブネス検知用）
+ */
+export async function verifyFace(
+  faceImageBase64: string,
+  challengeTypes?: string[],
+  allImagesBase64?: string[]
+) {
   return apiRequest<{
     ok: boolean;
     verified: boolean;
     confidence: number;
     message: string;
     needs_registration?: boolean;
+    liveness_passed?: boolean;
     dev_mode?: boolean;
     fallback?: boolean;
   }>('/face/verify', 'POST', {
     face_image_base64: faceImageBase64,
+    challenge_types: challengeTypes || [],
+    all_images_base64: allImagesBase64 || [],
   });
 }
