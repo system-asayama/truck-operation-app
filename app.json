@@ -19,6 +19,7 @@
         "NSLocationWhenInUseUsageDescription": "運行中のGPS位置情報を記録するために使用します。",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "バックグラウンドでもGPS位置情報を記録するために使用します。",
         "NSLocationAlwaysUsageDescription": "バックグラウンドでもGPS位置情報を記録するために使用します。",
+        "NSCameraUsageDescription": "顔認証による本人確認のためにカメラを使用します。",
         "UIBackgroundModes": ["location", "fetch"]
       }
     },
@@ -32,7 +33,8 @@
         "ACCESS_COARSE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION"
+        "FOREGROUND_SERVICE_LOCATION",
+        "CAMERA"
       ],
       "package": "com.asayama.truckoperationapp",
       "edgeToEdgeEnabled": true,
@@ -48,6 +50,12 @@
           "locationAlwaysAndWhenInUsePermission": "バックグラウンドでもGPS位置情報を記録するために使用します。",
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "顔認証による本人確認のためにカメラを使用します。"
         }
       ]
     ]

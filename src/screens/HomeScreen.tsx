@@ -1,3 +1,8 @@
+/**
+ * ホーム画面（運行ダッシュボード）
+ * 出発ボタンを押すと顔認証画面を表示し、認証成功後に出発打刻を行う。
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -8,11 +13,13 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { getTodayAttendance, clockIn, clockOut, breakStart, breakEnd } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { useGpsTracking } from '../hooks/useGpsTracking';
 import { AttendanceStatus } from '../types';
+import FaceAuthScreen from './FaceAuthScreen';
 
 function getStatusLabel(status: AttendanceStatus): string {
   switch (status) {
@@ -47,6 +54,9 @@ export default function HomeScreen() {
   const [actionLoading, setActionLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // 顔認証モーダル制御
+  const [showFaceAuth, setShowFaceAuth] = useState(false);
 
   const { isTracking, lastLocation, startTracking, stopTracking } = useGpsTracking({
     enabled: auth.gpsEnabled,
@@ -86,8 +96,14 @@ export default function HomeScreen() {
     setRefreshing(false);
   }, [loadAttendance]);
 
-  // 出発（出勤）
-  const handleClockIn = async () => {
+  // 出発ボタン押下 → 顔認証モーダルを表示
+  const handleClockInPress = () => {
+    setShowFaceAuth(true);
+  };
+
+  // 顔認証成功 → 実際の出発打刻処理
+  const handleFaceAuthSuccess = async () => {
+    setShowFaceAuth(false);
     setActionLoading(true);
     try {
       const result = await clockIn();
@@ -105,6 +121,11 @@ export default function HomeScreen() {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  // 顔認証キャンセル
+  const handleFaceAuthCancel = () => {
+    setShowFaceAuth(false);
   };
 
   // 帰着（退勤）
@@ -190,140 +211,156 @@ export default function HomeScreen() {
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-    >
-      {/* 現在時刻 */}
-      <View style={styles.timeCard}>
-        <Text style={styles.currentTime}>
-          {currentTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-        </Text>
-        <Text style={styles.currentDate}>
-          {currentTime.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })}
-        </Text>
-      </View>
-
-      {/* ドライバー情報 */}
-      <View style={styles.driverCard}>
-        <Text style={styles.driverLabel}>ドライバー</Text>
-        <Text style={styles.driverName}>{auth.name || 'ドライバー'}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(status) }]}>
-          <Text style={styles.statusText}>{getStatusLabel(status)}</Text>
-        </View>
-      </View>
-
-      {/* 運行情報 */}
-      <View style={styles.infoCard}>
-        <Text style={styles.cardTitle}>本日の運行記録</Text>
-        <View style={styles.timeRow}>
-          <View style={styles.timeItem}>
-            <Text style={styles.timeLabel}>🚀 出発</Text>
-            <Text style={styles.timeValue}>{formatTime(attendance?.clock_in)}</Text>
-          </View>
-          <View style={styles.timeDivider} />
-          <View style={styles.timeItem}>
-            <Text style={styles.timeLabel}>🏁 帰着</Text>
-            <Text style={styles.timeValue}>{formatTime(attendance?.clock_out)}</Text>
-          </View>
-        </View>
-        <View style={styles.breakRow}>
-          <Text style={styles.breakLabel}>休憩時間</Text>
-          <Text style={styles.breakValue}>{attendance?.break_minutes || 0}分</Text>
-        </View>
-      </View>
-
-      {/* GPS状態 */}
-      {auth.gpsEnabled && (
-        <View style={styles.gpsCard}>
-          <View style={styles.gpsHeader}>
-            <Text style={styles.cardTitle}>GPS追跡</Text>
-            <View style={[styles.gpsBadge, { backgroundColor: isTracking ? '#27ae60' : '#888' }]}>
-              <Text style={styles.gpsBadgeText}>{isTracking ? '追跡中' : '停止中'}</Text>
-            </View>
-          </View>
-          {lastLocation && (
-            <Text style={styles.gpsInfo}>
-              最終取得: {lastLocation.timestamp ? new Date(lastLocation.timestamp).toLocaleTimeString('ja-JP') : '--'}
-              {'\n'}緯度: {lastLocation.latitude.toFixed(6)}
-              {'\n'}経度: {lastLocation.longitude.toFixed(6)}
-            </Text>
-          )}
-          <Text style={styles.gpsInterval}>
-            送信間隔: {auth.gpsIntervalSeconds}秒
+    <>
+      <ScrollView
+        style={styles.container}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        {/* 現在時刻 */}
+        <View style={styles.timeCard}>
+          <Text style={styles.currentTime}>
+            {currentTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          </Text>
+          <Text style={styles.currentDate}>
+            {currentTime.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })}
           </Text>
         </View>
-      )}
 
-      {/* アクションボタン */}
-      <View style={styles.actionArea}>
-        {status === 'not_started' && (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.clockInButton]}
-            onPress={handleClockIn}
-            disabled={actionLoading}
-          >
-            {actionLoading ? <ActivityIndicator color="#fff" /> : (
-              <>
-                <Text style={styles.actionButtonIcon}>🚛</Text>
-                <Text style={styles.actionButtonText}>出発する</Text>
-              </>
+        {/* ドライバー情報 */}
+        <View style={styles.driverCard}>
+          <Text style={styles.driverLabel}>ドライバー</Text>
+          <Text style={styles.driverName}>{auth.name || 'ドライバー'}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(status) }]}>
+            <Text style={styles.statusText}>{getStatusLabel(status)}</Text>
+          </View>
+        </View>
+
+        {/* 運行情報 */}
+        <View style={styles.infoCard}>
+          <Text style={styles.cardTitle}>本日の運行記録</Text>
+          <View style={styles.timeRow}>
+            <View style={styles.timeItem}>
+              <Text style={styles.timeLabel}>🚀 出発</Text>
+              <Text style={styles.timeValue}>{formatTime(attendance?.clock_in)}</Text>
+            </View>
+            <View style={styles.timeDivider} />
+            <View style={styles.timeItem}>
+              <Text style={styles.timeLabel}>🏁 帰着</Text>
+              <Text style={styles.timeValue}>{formatTime(attendance?.clock_out)}</Text>
+            </View>
+          </View>
+          <View style={styles.breakRow}>
+            <Text style={styles.breakLabel}>休憩時間</Text>
+            <Text style={styles.breakValue}>{attendance?.break_minutes || 0}分</Text>
+          </View>
+        </View>
+
+        {/* GPS状態 */}
+        {auth.gpsEnabled && (
+          <View style={styles.gpsCard}>
+            <View style={styles.gpsHeader}>
+              <Text style={styles.cardTitle}>GPS追跡</Text>
+              <View style={[styles.gpsBadge, { backgroundColor: isTracking ? '#27ae60' : '#888' }]}>
+                <Text style={styles.gpsBadgeText}>{isTracking ? '追跡中' : '停止中'}</Text>
+              </View>
+            </View>
+            {lastLocation && (
+              <Text style={styles.gpsInfo}>
+                最終取得: {lastLocation.timestamp ? new Date(lastLocation.timestamp).toLocaleTimeString('ja-JP') : '--'}
+                {'\n'}緯度: {lastLocation.latitude.toFixed(6)}
+                {'\n'}経度: {lastLocation.longitude.toFixed(6)}
+              </Text>
             )}
-          </TouchableOpacity>
+            <Text style={styles.gpsInterval}>
+              送信間隔: {auth.gpsIntervalSeconds}秒
+            </Text>
+          </View>
         )}
 
-        {status === 'working' && (
-          <View style={styles.buttonRow}>
+        {/* アクションボタン */}
+        <View style={styles.actionArea}>
+          {status === 'not_started' && (
             <TouchableOpacity
-              style={[styles.actionButton, styles.breakButton, styles.halfButton]}
-              onPress={handleBreakStart}
+              style={[styles.actionButton, styles.clockInButton]}
+              onPress={handleClockInPress}
               disabled={actionLoading}
             >
               {actionLoading ? <ActivityIndicator color="#fff" /> : (
                 <>
-                  <Text style={styles.actionButtonIcon}>☕</Text>
-                  <Text style={styles.actionButtonText}>休憩開始</Text>
+                  <Text style={styles.actionButtonIcon}>🚛</Text>
+                  <Text style={styles.actionButtonText}>出発する</Text>
+                  <Text style={styles.actionButtonSubText}>（顔認証あり）</Text>
                 </>
               )}
             </TouchableOpacity>
+          )}
+
+          {status === 'working' && (
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.breakButton, styles.halfButton]}
+                onPress={handleBreakStart}
+                disabled={actionLoading}
+              >
+                {actionLoading ? <ActivityIndicator color="#fff" /> : (
+                  <>
+                    <Text style={styles.actionButtonIcon}>☕</Text>
+                    <Text style={styles.actionButtonText}>休憩開始</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.clockOutButton, styles.halfButton]}
+                onPress={handleClockOut}
+                disabled={actionLoading}
+              >
+                {actionLoading ? <ActivityIndicator color="#fff" /> : (
+                  <>
+                    <Text style={styles.actionButtonIcon}>🏁</Text>
+                    <Text style={styles.actionButtonText}>帰着する</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {status === 'on_break' && (
             <TouchableOpacity
-              style={[styles.actionButton, styles.clockOutButton, styles.halfButton]}
-              onPress={handleClockOut}
+              style={[styles.actionButton, styles.breakEndButton]}
+              onPress={handleBreakEnd}
               disabled={actionLoading}
             >
               {actionLoading ? <ActivityIndicator color="#fff" /> : (
                 <>
-                  <Text style={styles.actionButtonIcon}>🏁</Text>
-                  <Text style={styles.actionButtonText}>帰着する</Text>
+                  <Text style={styles.actionButtonIcon}>▶️</Text>
+                  <Text style={styles.actionButtonText}>休憩終了・運行再開</Text>
                 </>
               )}
             </TouchableOpacity>
-          </View>
-        )}
+          )}
 
-        {status === 'on_break' && (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.breakEndButton]}
-            onPress={handleBreakEnd}
-            disabled={actionLoading}
-          >
-            {actionLoading ? <ActivityIndicator color="#fff" /> : (
-              <>
-                <Text style={styles.actionButtonIcon}>▶️</Text>
-                <Text style={styles.actionButtonText}>休憩終了・運行再開</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        )}
+          {status === 'finished' && (
+            <View style={styles.finishedCard}>
+              <Text style={styles.finishedIcon}>✅</Text>
+              <Text style={styles.finishedText}>本日の運行は終了しました</Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
 
-        {status === 'finished' && (
-          <View style={styles.finishedCard}>
-            <Text style={styles.finishedIcon}>✅</Text>
-            <Text style={styles.finishedText}>本日の運行は終了しました</Text>
-          </View>
-        )}
-      </View>
-    </ScrollView>
+      {/* 顔認証モーダル */}
+      <Modal
+        visible={showFaceAuth}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={handleFaceAuthCancel}
+      >
+        <FaceAuthScreen
+          onSuccess={handleFaceAuthSuccess}
+          onCancel={handleFaceAuthCancel}
+        />
+      </Modal>
+    </>
   );
 }
 
@@ -533,6 +570,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  actionButtonSubText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    marginTop: 2,
   },
   finishedCard: {
     backgroundColor: '#fff',

@@ -194,3 +194,41 @@ export async function getTodayLocations() {
 export async function getRealtimeMode() {
   return apiRequest<any>('/location/realtime_mode', 'GET');
 }
+
+// ─────────────────────────────────────────────
+// 顔認証 API
+// ─────────────────────────────────────────────
+
+/** 顔写真の登録状況を確認する */
+export async function getFaceStatus() {
+  return apiRequest<{
+    ok: boolean;
+    registered: boolean;
+    registered_at: string | null;
+  }>('/face/status', 'GET');
+}
+
+/** 顔写真を登録する（初回セットアップ時） */
+export async function registerFace(faceImageBase64: string) {
+  return apiRequest<{
+    ok: boolean;
+    message: string;
+  }>('/face/register', 'POST', {
+    face_image_base64: faceImageBase64,
+  });
+}
+
+/** 顔認証を実行する（出発打刻前の本人確認） */
+export async function verifyFace(faceImageBase64: string) {
+  return apiRequest<{
+    ok: boolean;
+    verified: boolean;
+    confidence: number;
+    message: string;
+    needs_registration?: boolean;
+    dev_mode?: boolean;
+    fallback?: boolean;
+  }>('/face/verify', 'POST', {
+    face_image_base64: faceImageBase64,
+  });
+}
