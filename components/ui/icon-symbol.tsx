@@ -20,7 +20,7 @@ const MAPPING = {
   "chevron.left.forwardslash.chevron.right": "code",
   "chevron.right": "chevron-right",
   "chevron.left": "chevron-left",
-  // Attendance
+  // Attendance / Time
   "clock.fill": "access-time",
   "clock": "access-time",
   "calendar": "calendar-today",
@@ -40,6 +40,23 @@ const MAPPING = {
   "xmark.circle.fill": "cancel",
   "pause.circle.fill": "pause-circle-filled",
   "play.circle.fill": "play-circle-filled",
+  // Truck / Operation specific
+  "truck.box.fill": "local-shipping",
+  "truck.fill": "local-shipping",
+  "shippingbox.fill": "inventory",
+  "shippingbox": "inventory",
+  "arrow.up.box.fill": "upload",
+  "arrow.down.box.fill": "download",
+  "flag.fill": "flag",
+  "flag.checkered": "sports-score",
+  "road.lanes": "route",
+  "car.fill": "directions-car",
+  "fuelpump.fill": "local-gas-station",
+  "speedometer": "speed",
+  "exclamationmark.triangle.fill": "warning",
+  "info.circle.fill": "info",
+  "doc.text.fill": "description",
+  "doc.text": "description",
   // Misc
   "list.bullet": "list",
   "gear": "settings",
@@ -53,7 +70,12 @@ const MAPPING = {
   "qrcode.viewfinder": "qr-code-scanner",
   "camera.fill": "camera-alt",
   "camera": "camera-alt",
-} as IconMapping;
+  "plus.circle.fill": "add-circle",
+  "minus.circle.fill": "remove-circle",
+  "arrow.clockwise": "refresh",
+  "xmark": "close",
+  "checkmark": "check",
+} as unknown as IconMapping;
 
 /**
  * An icon component that uses native SF Symbols on iOS, and Material Icons on Android and web.

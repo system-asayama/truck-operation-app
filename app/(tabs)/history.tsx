@@ -1,343 +1,277 @@
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { useState, useEffect, useCallback } from "react";
+/**
+ * トラック運行管理 - 運行履歴画面
+ */
+import React, { useState, useCallback } from "react";
+import {
+  Text,
+  View,
+  StyleSheet,
+  ActivityIndicator,
+  FlatList,
+  TouchableOpacity,
+} from "react-native";
+import { useFocusEffect } from "expo-router";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
-import { getFlaskStaffInfo, type FlaskStaffInfo } from "@/lib/flask-api-client";
+import {
+  getTruckDriverInfo,
+  getOperationHistory,
+  type TruckOperation,
+} from "@/lib/truck-api-client";
 
-function getCurrentYearMonth(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  return `${y}-${m}`;
-}
+const STATUS_LABELS: Record<string, string> = {
+  off: "待機中",
+  driving: "運行中",
+  break: "休憩中",
+  loading: "荷積み中",
+  unloading: "荷下ろし中",
+  finished: "運行完了",
+};
 
-function formatTime(timeStr: string | null | undefined): string {
-  if (!timeStr) return "--:--";
-  const parts = timeStr.split("T");
-  const timePart = parts.length > 1 ? parts[1] : parts[0];
-  const [h, m] = timePart.split(":");
-  return `${h.padStart(2, "0")}:${m.padStart(2, "0")}`;
-}
-
-function calcWorkingHours(clockIn: string | null | undefined, clockOut: string | null | undefined): string {
-  if (!clockIn || !clockOut) return "-";
-  // Parse time strings (HH:MM:SS or ISO)
-  const parseTime = (t: string) => {
-    const parts = t.split("T");
-    const timePart = parts.length > 1 ? parts[1] : parts[0];
-    const [h, m, s] = timePart.split(":").map(Number);
-    return h * 3600 + m * 60 + (s || 0);
-  };
-  const inSec = parseTime(clockIn);
-  const outSec = parseTime(clockOut);
-  const diffSec = outSec - inSec;
-  if (diffSec <= 0) return "-";
-  const hours = Math.floor(diffSec / 3600);
-  const minutes = Math.floor((diffSec % 3600) / 60);
-  return `${hours}h${minutes}m`;
-}
-
-function getStatusColor(status: string, colors: ReturnType<typeof useColors>): string {
-  switch (status) {
-    case "working": return colors.success;
-    case "break": return colors.warning;
-    case "finished": return colors.primary;
-    default: return colors.muted;
-  }
-}
-
-function getStatusLabel(status: string): string {
-  switch (status) {
-    case "working": return "出勤中";
-    case "break": return "休憩中";
-    case "finished": return "退勤済";
-    default: return "未出勤";
-  }
-}
-
-function prevMonth(yearMonth: string): string {
-  const [y, m] = yearMonth.split("-").map(Number);
-  if (m === 1) return `${y - 1}-12`;
-  return `${y}-${String(m - 1).padStart(2, "0")}`;
-}
-
-function nextMonth(yearMonth: string): string {
-  const [y, m] = yearMonth.split("-").map(Number);
-  if (m === 12) return `${y + 1}-01`;
-  return `${y}-${String(m + 1).padStart(2, "0")}`;
-}
-
-interface FlaskMonthlyRecord {
-  id: number;
-  workDate: string;
-  clockIn: string | null;
-  clockOut: string | null;
-  breakStart: string | null;
-  breakEnd: string | null;
-  breakMinutes: number;
-  status: string;
-  note: string | null;
-}
+const STATUS_COLORS: Record<string, string> = {
+  off: "#64748b",
+  driving: "#16a34a",
+  break: "#d97706",
+  loading: "#2563eb",
+  unloading: "#7c3aed",
+  finished: "#64748b",
+};
 
 export default function HistoryScreen() {
   const colors = useColors();
-  const [yearMonth, setYearMonth] = useState(getCurrentYearMonth());
+  const [operations, setOperations] = useState<TruckOperation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [flaskInfo, setFlaskInfo] = useState<FlaskStaffInfo | null>(null);
-  const [records, setRecords] = useState<FlaskMonthlyRecord[]>([]);
+  const [hasDriver, setHasDriver] = useState(false);
 
-  const [y, m] = yearMonth.split("-");
-  const currentYearMonth = getCurrentYearMonth();
-  const isCurrentMonth = yearMonth === currentYearMonth;
+  const now = new Date();
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
 
-  // Flask接続情報を取得
-  useEffect(() => {
-    let cancelled = false;
-    getFlaskStaffInfo().then((info) => {
-      if (!cancelled) setFlaskInfo(info);
-    });
-    return () => { cancelled = true; };
-  }, []);
-
-  // 月次勤怠データを取得
-  const loadMonthlyRecords = useCallback(async (info: FlaskStaffInfo | null, ym: string) => {
+  const loadHistory = useCallback(async () => {
+    setLoading(true);
+    const info = await getTruckDriverInfo();
     if (!info) {
-      setRecords([]);
+      setHasDriver(false);
       setLoading(false);
       return;
     }
-    setLoading(true);
-    try {
-      const url = `${info.apiUrl.replace(/\/$/, "")}/api/mobile/attendance/monthly?year_month=${ym}`;
-      const response = await fetch(url, {
-        headers: {
-          "X-Mobile-API-Key": info.mobileApiKey ?? "",
-          "X-Staff-Token": info.staffToken,
-        },
-      });
-      const json = await response.json();
-      if (json.ok && Array.isArray(json.records)) {
-        // snake_case → camelCase
-        const mapped: FlaskMonthlyRecord[] = json.records.map((r: any) => ({
-          id: r.id,
-          workDate: r.work_date,
-          clockIn: r.clock_in,
-          clockOut: r.clock_out,
-          breakStart: r.break_start,
-          breakEnd: r.break_end,
-          breakMinutes: r.break_minutes ?? 0,
-          status: r.status,
-          note: r.note,
-        }));
-        setRecords(mapped);
-      } else {
-        setRecords([]);
-      }
-    } catch {
-      setRecords([]);
-    } finally {
-      setLoading(false);
+    setHasDriver(true);
+    const result = await getOperationHistory(info, { year: selectedYear, month: selectedMonth });
+    if (result.ok && result.operations) {
+      setOperations(result.operations);
+    } else {
+      setOperations([]);
     }
-  }, []);
+    setLoading(false);
+  }, [selectedYear, selectedMonth]);
 
-  useEffect(() => {
-    loadMonthlyRecords(flaskInfo, yearMonth);
-  }, [flaskInfo, yearMonth, loadMonthlyRecords]);
+  useFocusEffect(
+    useCallback(() => {
+      loadHistory();
+    }, [loadHistory])
+  );
 
-  if (!flaskInfo && !loading) {
+  const formatTime = (dateStr: string | null) => {
+    if (!dateStr) return "--:--";
+    const d = new Date(dateStr);
+    return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+  };
+
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const days = ["日", "月", "火", "水", "木", "金", "土"];
+    return `${d.getMonth() + 1}/${d.getDate()}（${days[d.getDay()]}）`;
+  };
+
+  const calcDuration = (startTime: string | null, endTime: string | null) => {
+    if (!startTime || !endTime) return null;
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    const diffMs = end.getTime() - start.getTime();
+    if (diffMs <= 0) return null;
+    const hours = Math.floor(diffMs / 3600000);
+    const minutes = Math.floor((diffMs % 3600000) / 60000);
+    return hours > 0 ? `${hours}時間${minutes}分` : `${minutes}分`;
+  };
+
+  const prevMonth = () => {
+    if (selectedMonth === 1) {
+      setSelectedYear(y => y - 1);
+      setSelectedMonth(12);
+    } else {
+      setSelectedMonth(m => m - 1);
+    }
+  };
+
+  const nextMonth = () => {
+    const n = new Date();
+    if (selectedYear > n.getFullYear() || (selectedYear === n.getFullYear() && selectedMonth >= n.getMonth() + 1)) return;
+    if (selectedMonth === 12) {
+      setSelectedYear(y => y + 1);
+      setSelectedMonth(1);
+    } else {
+      setSelectedMonth(m => m + 1);
+    }
+  };
+
+  const isCurrentMonth = selectedYear === now.getFullYear() && selectedMonth === now.getMonth() + 1;
+
+  if (!hasDriver && !loading) {
     return (
       <ScreenContainer className="items-center justify-center p-6">
-        <Text style={{ color: colors.muted, fontSize: 16 }}>ログインが必要です</Text>
-        <Text style={{ color: colors.muted, fontSize: 13, marginTop: 8, textAlign: "center" }}>
-          設定タブから顧問先管理アプリに接続してください
+        <IconSymbol name="doc.text.fill" size={48} color={colors.muted} />
+        <Text style={[styles.emptyTitle, { color: colors.foreground }]}>履歴がありません</Text>
+        <Text style={[styles.emptyText, { color: colors.muted }]}>
+          設定画面でログインしてください
         </Text>
       </ScreenContainer>
     );
   }
 
   return (
-    <ScreenContainer>
-      {/* ヘッダー */}
+    <ScreenContainer containerClassName="bg-background">
       <View style={[styles.header, { backgroundColor: colors.primary }]}>
-        <Text style={styles.headerTitle}>勤怠履歴</Text>
-
-        {/* 月切り替え */}
-        <View style={styles.monthNav}>
-          <TouchableOpacity
-            style={styles.monthNavBtn}
-            onPress={() => setYearMonth(prevMonth(yearMonth))}
-            activeOpacity={0.7}
-          >
-            <IconSymbol name="chevron.left" size={20} color="#ffffff" />
-          </TouchableOpacity>
-          <Text style={styles.monthLabel}>{y}年{m}月</Text>
-          <TouchableOpacity
-            style={styles.monthNavBtn}
-            onPress={() => setYearMonth(nextMonth(yearMonth))}
-            disabled={isCurrentMonth}
-            activeOpacity={0.7}
-          >
-            <IconSymbol name="chevron.right" size={20} color={isCurrentMonth ? "rgba(255,255,255,0.3)" : "#ffffff"} />
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.headerTitle}>運行履歴</Text>
       </View>
 
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-        <View style={styles.content}>
-          {loading ? (
-            <Text style={{ color: colors.muted, textAlign: "center", marginTop: 40 }}>読み込み中...</Text>
-          ) : records.length === 0 ? (
-            <View style={styles.emptyState}>
-              <IconSymbol name="calendar" size={48} color={colors.border} />
-              <Text style={[styles.emptyText, { color: colors.muted }]}>この月の勤怠記録はありません</Text>
-            </View>
-          ) : (
-            records.map((record) => (
-              <View
-                key={record.id}
-                style={[styles.recordCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              >
-                <View style={styles.recordHeader}>
-                  <Text style={[styles.recordDate, { color: colors.foreground }]}>
-                    {record.workDate}
-                  </Text>
-                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(record.status, colors) + "15" }]}>
-                    <Text style={[styles.statusBadgeText, { color: getStatusColor(record.status, colors) }]}>
-                      {getStatusLabel(record.status)}
-                    </Text>
-                  </View>
-                </View>
+      <View style={[styles.monthSelector, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <TouchableOpacity style={styles.monthArrow} onPress={prevMonth}>
+          <IconSymbol name="chevron.left" size={20} color={colors.primary} />
+        </TouchableOpacity>
+        <Text style={[styles.monthText, { color: colors.foreground }]}>
+          {selectedYear}年{selectedMonth}月
+        </Text>
+        <TouchableOpacity
+          style={[styles.monthArrow, isCurrentMonth && styles.monthArrowDisabled]}
+          onPress={nextMonth}
+          disabled={isCurrentMonth}
+        >
+          <IconSymbol name="chevron.right" size={20} color={isCurrentMonth ? colors.border : colors.primary} />
+        </TouchableOpacity>
+      </View>
 
-                <View style={styles.recordTimes}>
-                  <View style={styles.recordTimeItem}>
-                    <Text style={[styles.recordTimeLabel, { color: colors.muted }]}>出勤</Text>
-                    <Text style={[styles.recordTimeValue, { color: colors.foreground }]}>
-                      {formatTime(record.clockIn)}
-                    </Text>
-                  </View>
-                  <View style={[styles.recordTimeDivider, { backgroundColor: colors.border }]} />
-                  <View style={styles.recordTimeItem}>
-                    <Text style={[styles.recordTimeLabel, { color: colors.muted }]}>退勤</Text>
-                    <Text style={[styles.recordTimeValue, { color: colors.foreground }]}>
-                      {formatTime(record.clockOut)}
-                    </Text>
-                  </View>
-                  <View style={[styles.recordTimeDivider, { backgroundColor: colors.border }]} />
-                  <View style={styles.recordTimeItem}>
-                    <Text style={[styles.recordTimeLabel, { color: colors.muted }]}>勤務時間</Text>
-                    <Text style={[styles.recordTimeValue, { color: colors.primary }]}>
-                      {calcWorkingHours(record.clockIn, record.clockOut)}
-                    </Text>
-                  </View>
-                </View>
-
-                {record.breakMinutes > 0 && (
-                  <Text style={[styles.breakInfo, { color: colors.muted }]}>
-                    休憩: {record.breakMinutes}分
-                  </Text>
-                )}
-              </View>
-            ))
-          )}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.muted }]}>読み込み中...</Text>
         </View>
-      </ScrollView>
+      ) : operations.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <IconSymbol name="doc.text" size={48} color={colors.muted} />
+          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>運行記録なし</Text>
+          <Text style={[styles.emptyText, { color: colors.muted }]}>
+            {selectedYear}年{selectedMonth}月の運行記録はありません
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={operations}
+          keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={styles.listContent}
+          renderItem={({ item }) => {
+            const statusColor = STATUS_COLORS[item.status] ?? colors.muted;
+            const statusLabel = STATUS_LABELS[item.status] ?? item.status;
+            const duration = calcDuration(item.startTime, item.endTime);
+
+            return (
+              <View style={[styles.operationCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={styles.cardTop}>
+                  <View style={styles.cardDateContainer}>
+                    <Text style={[styles.cardDate, { color: colors.foreground }]}>
+                      {formatDate(item.operationDate)}
+                    </Text>
+                    <View style={[styles.statusBadge, { backgroundColor: statusColor + "20" }]}>
+                      <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+                      <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.cardBody}>
+                  <View style={styles.infoRow}>
+                    <View style={styles.infoItem}>
+                      <IconSymbol name="truck.box.fill" size={16} color={colors.muted} />
+                      <Text style={[styles.infoLabel, { color: colors.muted }]}>トラック</Text>
+                    </View>
+                    <Text style={[styles.infoValue, { color: colors.foreground }]}>
+                      {item.truckName ?? "---"} ({item.truckNumber ?? "---"})
+                    </Text>
+                  </View>
+
+                  {item.routeName ? (
+                    <View style={styles.infoRow}>
+                      <View style={styles.infoItem}>
+                        <IconSymbol name="road.lanes" size={16} color={colors.muted} />
+                        <Text style={[styles.infoLabel, { color: colors.muted }]}>ルート</Text>
+                      </View>
+                      <Text style={[styles.infoValue, { color: colors.foreground }]}>{item.routeName}</Text>
+                    </View>
+                  ) : null}
+
+                  <View style={[styles.timeRow, { borderTopColor: colors.border }]}>
+                    <View style={styles.timeItem}>
+                      <Text style={[styles.timeLabel, { color: colors.muted }]}>開始</Text>
+                      <Text style={[styles.timeValue, { color: colors.foreground }]}>
+                        {formatTime(item.startTime)}
+                      </Text>
+                    </View>
+                    <View style={[styles.timeDivider, { backgroundColor: colors.border }]} />
+                    <View style={styles.timeItem}>
+                      <Text style={[styles.timeLabel, { color: colors.muted }]}>終了</Text>
+                      <Text style={[styles.timeValue, { color: colors.foreground }]}>
+                        {formatTime(item.endTime)}
+                      </Text>
+                    </View>
+                    {duration ? (
+                      <>
+                        <View style={[styles.timeDivider, { backgroundColor: colors.border }]} />
+                        <View style={styles.timeItem}>
+                          <Text style={[styles.timeLabel, { color: colors.muted }]}>運行時間</Text>
+                          <Text style={[styles.timeValue, { color: colors.primary }]}>{duration}</Text>
+                        </View>
+                      </>
+                    ) : null}
+                  </View>
+                </View>
+              </View>
+            );
+          }}
+        />
+      )}
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 20,
-  },
-  headerTitle: {
-    color: "#ffffff",
-    fontSize: 22,
-    fontWeight: "700",
-    marginBottom: 12,
-  },
-  monthNav: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  monthNavBtn: {
-    padding: 4,
-  },
-  monthLabel: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "600",
-    minWidth: 80,
-    textAlign: "center",
-  },
-  content: {
-    padding: 16,
-    gap: 12,
-  },
-  emptyState: {
-    alignItems: "center",
-    paddingVertical: 60,
-    gap: 12,
-  },
-  emptyText: {
-    fontSize: 15,
-  },
-  recordCard: {
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    gap: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  recordHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  recordDate: {
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusBadgeText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  recordTimes: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  recordTimeItem: {
-    flex: 1,
-    alignItems: "center",
-    gap: 4,
-  },
-  recordTimeLabel: {
-    fontSize: 12,
-  },
-  recordTimeValue: {
-    fontSize: 16,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  recordTimeDivider: {
-    width: 1,
-    height: 36,
-  },
-  breakInfo: {
-    fontSize: 12,
-    textAlign: "right",
-  },
+  header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
+  headerTitle: { color: "#ffffff", fontSize: 22, fontWeight: "700" },
+  monthSelector: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 1 },
+  monthArrow: { padding: 8 },
+  monthArrowDisabled: { opacity: 0.3 },
+  monthText: { fontSize: 16, fontWeight: "600" },
+  loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
+  loadingText: { fontSize: 15 },
+  emptyContainer: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 32 },
+  emptyTitle: { fontSize: 18, fontWeight: "700" },
+  emptyText: { fontSize: 14, textAlign: "center", lineHeight: 22 },
+  listContent: { padding: 16, gap: 12, paddingBottom: 32 },
+  operationCard: { borderRadius: 16, borderWidth: 1, overflow: "hidden", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  cardTop: { padding: 14, paddingBottom: 10 },
+  cardDateContainer: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  cardDate: { fontSize: 16, fontWeight: "700" },
+  statusBadge: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, gap: 5 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusText: { fontSize: 12, fontWeight: "600" },
+  cardBody: { paddingHorizontal: 14, paddingBottom: 14, gap: 8 },
+  infoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  infoItem: { flexDirection: "row", alignItems: "center", gap: 4 },
+  infoLabel: { fontSize: 13 },
+  infoValue: { fontSize: 13, fontWeight: "600" },
+  timeRow: { flexDirection: "row", alignItems: "center", paddingTop: 10, marginTop: 4, borderTopWidth: 1 },
+  timeItem: { flex: 1, alignItems: "center", gap: 3 },
+  timeDivider: { width: 1, height: 32 },
+  timeLabel: { fontSize: 11 },
+  timeValue: { fontSize: 16, fontWeight: "700" },
 });

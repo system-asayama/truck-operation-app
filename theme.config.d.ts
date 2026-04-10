@@ -9,6 +9,7 @@ export const themeColors: {
   warning: { light: string; dark: string };
   error: { light: string; dark: string };
   tint: { light: string; dark: string };
+  accent: { light: string; dark: string };
 };
 
 declare const themeConfig: {
