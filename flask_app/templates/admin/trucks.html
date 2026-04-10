@@ -1,0 +1,32 @@
+{% extends "admin/base.html" %}
+{% block title %}トラック管理 - トラック運行管理{% endblock %}
+{% block content %}
+<div class="page-title">トラック管理</div>
+
+{% if error %}
+<div class="error-box">⚠ {{ error }}</div>
+{% endif %}
+
+{% if trucks %}
+<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px;">
+  {% for t in trucks %}
+  {% set s = t.status %}
+  {% set scolor = {'available':'#16a34a','in_use':'#2563eb','maintenance':'#d97706','inactive':'#6b7280'} %}
+  {% set slabel = {'available':'待機中','in_use':'使用中','maintenance':'整備中','inactive':'停止中'} %}
+  <div class="card" style="margin-bottom:0;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <span style="font-size:32px;">🚛</span>
+      <span class="badge" style="background:{{ scolor.get(s,'#6b7280') }}">{{ slabel.get(s, s) }}</span>
+    </div>
+    <div style="font-size:16px; font-weight:700; color:#0f2744; margin-bottom:4px;">{{ t.truck_name or t.truckName }}</div>
+    <div style="font-size:14px; color:#6b7280;">{{ t.truck_number or t.truckNumber }}</div>
+    {% if t.capacity %}
+    <div style="font-size:13px; color:#9ca3af; margin-top:4px;">積載量: {{ t.capacity }}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card"><div class="empty">トラックが登録されていません</div></div>
+{% endif %}
+{% endblock %}

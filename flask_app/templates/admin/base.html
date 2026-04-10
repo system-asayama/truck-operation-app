@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}トラック運行管理{% endblock %}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: #f3f4f6; color: #374151; }
+    a { color: inherit; text-decoration: none; }
+
+    /* サイドバー */
+    .sidebar {
+      position: fixed; top: 0; left: 0; width: 220px; height: 100vh;
+      background: linear-gradient(180deg, #0f2744 0%, #1a3a5c 100%);
+      display: flex; flex-direction: column; z-index: 100;
+    }
+    .sidebar-header { padding: 24px 20px 16px; display: flex; align-items: center; gap: 12px; }
+    .sidebar-logo-icon { font-size: 32px; }
+    .sidebar-logo-title { font-size: 15px; font-weight: 700; color: #fff; line-height: 1.2; }
+    .sidebar-logo-sub { font-size: 11px; color: rgba(255,255,255,0.6); }
+    .sidebar-nav { flex: 1; padding: 8px 12px; display: flex; flex-direction: column; gap: 4px; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: 8px;
+      color: rgba(255,255,255,0.7); font-size: 14px; font-weight: 500;
+      transition: all 0.2s;
+    }
+    .nav-item:hover, .nav-item.active { background: rgba(255,255,255,0.15); color: #fff; }
+    .nav-icon { font-size: 18px; width: 22px; text-align: center; }
+    .sidebar-footer { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.1); }
+    .user-info { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .user-avatar {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: rgba(255,255,255,0.2); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700; flex-shrink: 0;
+    }
+    .user-name { font-size: 13px; font-weight: 600; color: #fff; }
+    .user-tenant { font-size: 11px; color: rgba(255,255,255,0.5); }
+    .logout-btn {
+      width: 100%; background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.8);
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 8px;
+      padding: 8px; font-size: 13px; cursor: pointer; font-family: inherit;
+    }
+    .logout-btn:hover { background: rgba(255,255,255,0.2); }
+
+    /* メインコンテンツ */
+    .main { margin-left: 220px; min-height: 100vh; }
+    .content { padding: 28px; max-width: 1100px; }
+
+    /* カード */
+    .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); margin-bottom: 20px; }
+    .card-title { font-size: 16px; font-weight: 700; color: #0f2744; margin-bottom: 16px; }
+
+    /* テーブル */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { background: #f9fafb; }
+    th { padding: 10px 14px; text-align: left; font-size: 13px; font-weight: 600; color: #6b7280; border-bottom: 1px solid #e5e7eb; }
+    td { padding: 12px 14px; font-size: 14px; color: #374151; border-bottom: 1px solid #f3f4f6; }
+    tr:last-child td { border-bottom: none; }
+
+    /* バッジ */
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; color: #fff; font-size: 12px; font-weight: 600; }
+
+    /* エラー */
+    .error-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px 16px; color: #dc2626; font-size: 14px; margin-bottom: 16px; }
+
+    /* 空状態 */
+    .empty { text-align: center; padding: 40px; color: #9ca3af; font-size: 14px; }
+
+    /* ページタイトル */
+    .page-title { font-size: 22px; font-weight: 700; color: #0f2744; margin-bottom: 4px; }
+    .page-subtitle { font-size: 14px; color: #6b7280; margin-bottom: 24px; }
+
+    /* フォーム */
+    .form-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-label { font-size: 12px; font-weight: 600; color: #6b7280; }
+    select, input[type="text"], input[type="password"] {
+      padding: 8px 12px; border: 1.5px solid #d1d5db; border-radius: 8px;
+      font-size: 14px; background: #fff; font-family: inherit;
+    }
+    .btn {
+      padding: 9px 18px; border-radius: 8px; font-size: 14px; font-weight: 600;
+      cursor: pointer; border: none; font-family: inherit;
+    }
+    .btn-primary { background: #1a3a5c; color: #fff; }
+    .btn-primary:hover { background: #0f2744; }
+
+    @media (max-width: 768px) {
+      .sidebar { transform: translateX(-100%); }
+      .main { margin-left: 0; }
+    }
+  </style>
+  {% block extra_style %}{% endblock %}
+</head>
+<body>
+{% block body %}
+<div class="sidebar">
+  <div class="sidebar-header">
+    <span class="sidebar-logo-icon">🚛</span>
+    <div>
+      <div class="sidebar-logo-title">トラック運行</div>
+      <div class="sidebar-logo-sub">管理システム</div>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+      <span class="nav-icon">📊</span> ダッシュボード
+    </a>
+    <a href="{{ url_for('history') }}" class="nav-item {% if request.endpoint == 'history' %}active{% endif %}">
+      <span class="nav-icon">📋</span> 運行履歴
+    </a>
+    <a href="{{ url_for('trucks') }}" class="nav-item {% if request.endpoint == 'trucks' %}active{% endif %}">
+      <span class="nav-icon">🚛</span> トラック管理
+    </a>
+    <a href="{{ url_for('drivers') }}" class="nav-item {% if request.endpoint == 'drivers' %}active{% endif %}">
+      <span class="nav-icon">👤</span> ドライバー管理
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user-info">
+      <div class="user-avatar">{{ session.get('staff_name', '管')[:1] }}</div>
+      <div>
+        <div class="user-name">{{ session.get('staff_name', '管理者') }}</div>
+        <div class="user-tenant">管理者</div>
+      </div>
+    </div>
+    <a href="{{ url_for('logout') }}"><button class="logout-btn">ログアウト</button></a>
+  </div>
+</div>
+<div class="main">
+  <div class="content">
+    {% block content %}{% endblock %}
+  </div>
+</div>
+{% endblock %}
+</body>
+</html>

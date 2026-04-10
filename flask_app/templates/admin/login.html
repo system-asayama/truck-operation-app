@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ログイン - トラック運行管理</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: linear-gradient(135deg, #0f2744 0%, #1a3a5c 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .card { background: #fff; border-radius: 16px; padding: 40px; width: 100%; max-width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+    .header { text-align: center; margin-bottom: 32px; }
+    .icon-wrap { width: 72px; height: 72px; background: linear-gradient(135deg, #1a3a5c, #2563eb); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 36px; }
+    h1 { font-size: 22px; font-weight: 700; color: #0f2744; margin-bottom: 4px; }
+    .subtitle { font-size: 14px; color: #6b7280; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+    input { width: 100%; padding: 10px 14px; border: 1.5px solid #d1d5db; border-radius: 8px; font-size: 15px; font-family: inherit; outline: none; }
+    input:focus { border-color: #2563eb; }
+    .error { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px 14px; color: #dc2626; font-size: 14px; margin-bottom: 16px; }
+    .btn { width: 100%; background: linear-gradient(135deg, #1a3a5c, #2563eb); color: #fff; border: none; border-radius: 10px; padding: 14px; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; margin-top: 8px; }
+    .btn:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="icon-wrap">🚛</div>
+      <h1>トラック運行管理</h1>
+      <p class="subtitle">管理者ログイン</p>
+    </div>
+    {% if error %}
+    <div class="error">{{ error }}</div>
+    {% endif %}
+    <form method="POST">
+      <div class="form-group">
+        <label for="login_id">ログインID</label>
+        <input type="text" id="login_id" name="login_id" placeholder="ログインID" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label for="password">パスワード</label>
+        <input type="password" id="password" name="password" placeholder="パスワード" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn">ログイン</button>
+    </form>
+  </div>
+</body>
+</html>
