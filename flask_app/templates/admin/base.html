@@ -9,82 +9,79 @@
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: #f3f4f6; color: #374151; }
     a { color: inherit; text-decoration: none; }
 
-    /* サイドバー */
-    .sidebar {
-      position: fixed; top: 0; left: 0; width: 220px; height: 100vh;
-      background: linear-gradient(180deg, #0f2744 0%, #1a3a5c 100%);
-      display: flex; flex-direction: column; z-index: 100;
+    /* トップヘッダー */
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; height: 56px;
+      background: linear-gradient(90deg, #0f2744 0%, #1a3a5c 100%);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 16px; z-index: 200; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
-    .sidebar-header { padding: 24px 20px 16px; display: flex; align-items: center; gap: 12px; }
-    .sidebar-logo-icon { font-size: 32px; }
-    .sidebar-logo-title { font-size: 15px; font-weight: 700; color: #fff; line-height: 1.2; }
-    .sidebar-logo-sub { font-size: 11px; color: rgba(255,255,255,0.6); }
-    .sidebar-nav { flex: 1; padding: 8px 12px; display: flex; flex-direction: column; gap: 4px; }
-    .nav-item {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 12px; border-radius: 8px;
-      color: rgba(255,255,255,0.7); font-size: 14px; font-weight: 500;
-      transition: all 0.2s;
-    }
-    .nav-item:hover, .nav-item.active { background: rgba(255,255,255,0.15); color: #fff; }
-    .nav-icon { font-size: 18px; width: 22px; text-align: center; }
-    .sidebar-footer { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.1); }
-    .user-info { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-    .user-avatar {
-      width: 34px; height: 34px; border-radius: 50%;
-      background: rgba(255,255,255,0.2); color: #fff;
+    .topbar-brand { display: flex; align-items: center; gap: 8px; }
+    .topbar-icon { font-size: 24px; }
+    .topbar-title { font-size: 16px; font-weight: 700; color: #fff; }
+    .topbar-user { display: flex; align-items: center; gap: 8px; }
+    .topbar-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: rgba(255,255,255,0.25); color: #fff;
       display: flex; align-items: center; justify-content: center;
-      font-size: 14px; font-weight: 700; flex-shrink: 0;
+      font-size: 13px; font-weight: 700;
     }
-    .user-name { font-size: 13px; font-weight: 600; color: #fff; }
-    .user-tenant { font-size: 11px; color: rgba(255,255,255,0.5); }
-    .logout-btn {
-      width: 100%; background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.8);
-      border: 1px solid rgba(255,255,255,0.2); border-radius: 8px;
-      padding: 8px; font-size: 13px; cursor: pointer; font-family: inherit;
+    .topbar-username { font-size: 13px; color: rgba(255,255,255,0.85); display: none; }
+    .topbar-logout {
+      background: rgba(255,255,255,0.15); color: #fff;
+      border: 1px solid rgba(255,255,255,0.3); border-radius: 6px;
+      padding: 5px 10px; font-size: 12px; cursor: pointer; font-family: inherit;
     }
-    .logout-btn:hover { background: rgba(255,255,255,0.2); }
+
+    /* ボトムナビ */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #fff; border-top: 1px solid #e5e7eb;
+      display: flex; z-index: 200;
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
+    }
+    .bottom-nav a {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      padding: 8px 4px 10px; font-size: 10px; color: #9ca3af;
+      border-top: 2px solid transparent; transition: all 0.15s;
+    }
+    .bottom-nav a.active { color: #1a3a5c; border-top-color: #1a3a5c; }
+    .bottom-nav a:hover { color: #1a3a5c; }
+    .bottom-nav .nav-icon { font-size: 20px; margin-bottom: 2px; }
 
     /* メインコンテンツ */
-    .main { margin-left: 220px; min-height: 100vh; }
-    .content { padding: 28px; max-width: 1100px; }
+    .main { padding-top: 56px; padding-bottom: 70px; min-height: 100vh; }
+    .content { padding: 16px; max-width: 900px; margin: 0 auto; }
 
     /* カード */
-    .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); margin-bottom: 20px; }
-    .card-title { font-size: 16px; font-weight: 700; color: #0f2744; margin-bottom: 16px; }
+    .card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); margin-bottom: 16px; }
+    .card-title { font-size: 15px; font-weight: 700; color: #0f2744; margin-bottom: 14px; }
 
     /* テーブル */
-    .table-wrap { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; }
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; min-width: 500px; }
     thead tr { background: #f9fafb; }
-    th { padding: 10px 14px; text-align: left; font-size: 13px; font-weight: 600; color: #6b7280; border-bottom: 1px solid #e5e7eb; }
-    td { padding: 12px 14px; font-size: 14px; color: #374151; border-bottom: 1px solid #f3f4f6; }
+    th { padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 600; color: #6b7280; border-bottom: 1px solid #e5e7eb; white-space: nowrap; }
+    td { padding: 11px 12px; font-size: 13px; color: #374151; border-bottom: 1px solid #f3f4f6; }
     tr:last-child td { border-bottom: none; }
 
     /* バッジ */
-    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; color: #fff; font-size: 12px; font-weight: 600; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; color: #fff; font-size: 11px; font-weight: 600; white-space: nowrap; }
 
     /* エラー */
-    .error-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px 16px; color: #dc2626; font-size: 14px; margin-bottom: 16px; }
+    .error-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px 14px; color: #dc2626; font-size: 13px; margin-bottom: 14px; }
 
     /* 空状態 */
-    .empty { text-align: center; padding: 40px; color: #9ca3af; font-size: 14px; }
+    .empty { text-align: center; padding: 32px; color: #9ca3af; font-size: 13px; }
 
     /* ページタイトル */
-    .page-title { font-size: 22px; font-weight: 700; color: #0f2744; margin-bottom: 4px; }
-    .page-subtitle { font-size: 14px; color: #6b7280; margin-bottom: 24px; }
+    .page-title { font-size: 20px; font-weight: 700; color: #0f2744; margin-bottom: 4px; }
+    .page-subtitle { font-size: 13px; color: #6b7280; margin-bottom: 18px; }
 
-    /* フォーム */
-    .form-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
-    .form-group { display: flex; flex-direction: column; gap: 6px; }
-    .form-label { font-size: 12px; font-weight: 600; color: #6b7280; }
-    select, input[type="text"], input[type="password"] {
-      padding: 8px 12px; border: 1.5px solid #d1d5db; border-radius: 8px;
-      font-size: 14px; background: #fff; font-family: inherit;
-    }
+    /* ボタン */
     .btn {
-      padding: 9px 18px; border-radius: 8px; font-size: 14px; font-weight: 600;
-      cursor: pointer; border: none; font-family: inherit;
+      padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
+      cursor: pointer; border: none; font-family: inherit; display: inline-block;
     }
     .btn-primary { background: #1a3a5c; color: #fff; }
     .btn-primary:hover { background: #0f2744; }
@@ -92,13 +89,15 @@
     .btn-secondary:hover { background: #e5e7eb; }
     .btn-danger { background: #fef2f2; color: #dc2626; border: 1.5px solid #fecaca; }
     .btn-danger:hover { background: #fee2e2; }
-    .btn-sm { padding: 5px 12px; font-size: 13px; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+
     /* フラッシュメッセージ */
-    .flash-success { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 16px; color: #16a34a; font-size: 14px; margin-bottom: 16px; }
-    .flash-error { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px 16px; color: #dc2626; font-size: 14px; margin-bottom: 16px; }
-    /* フォーム（詳細） */
-    .form-card { background: #fff; border-radius: 12px; padding: 28px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); max-width: 600px; }
-    .form-field { margin-bottom: 18px; }
+    .flash-success { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 14px; color: #16a34a; font-size: 13px; margin-bottom: 14px; }
+    .flash-error { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px 14px; color: #dc2626; font-size: 13px; margin-bottom: 14px; }
+
+    /* フォーム */
+    .form-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+    .form-field { margin-bottom: 16px; }
     .form-field label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
     .form-field input[type=text], .form-field input[type=password], .form-field input[type=number], .form-field textarea, .form-field select {
       width: 100%; padding: 10px 12px; border: 1.5px solid #d1d5db; border-radius: 8px;
@@ -106,54 +105,34 @@
     }
     .form-field textarea { resize: vertical; min-height: 80px; }
     .form-field input:focus, .form-field textarea:focus, .form-field select:focus { outline: none; border-color: #1a3a5c; }
-    .form-actions { display: flex; gap: 12px; margin-top: 24px; }
+    .form-actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
     .required { color: #dc2626; }
 
-    @media (max-width: 768px) {
-      .sidebar { transform: translateX(-100%); }
-      .main { margin-left: 0; }
+    /* デスクトップ対応 */
+    @media (min-width: 769px) {
+      .topbar-username { display: block; }
+      .content { padding: 24px 28px; }
+      .card { padding: 20px; }
     }
   </style>
   {% block extra_style %}{% endblock %}
 </head>
 <body>
 {% block body %}
-<div class="sidebar">
-  <div class="sidebar-header">
-    <span class="sidebar-logo-icon">🚛</span>
-    <div>
-      <div class="sidebar-logo-title">トラック運行</div>
-      <div class="sidebar-logo-sub">管理システム</div>
-    </div>
+<!-- トップバー -->
+<header class="topbar">
+  <div class="topbar-brand">
+    <span class="topbar-icon">🚛</span>
+    <span class="topbar-title">トラック運行管理</span>
   </div>
-  <nav class="sidebar-nav">
-    <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
-      <span class="nav-icon">📊</span> ダッシュボード
-    </a>
-    <a href="{{ url_for('history') }}" class="nav-item {% if request.endpoint == 'history' %}active{% endif %}">
-      <span class="nav-icon">📋</span> 運行履歴
-    </a>
-    <a href="{{ url_for('trucks') }}" class="nav-item {% if request.endpoint == 'trucks' %}active{% endif %}">
-      <span class="nav-icon">🚛</span> トラック管理
-    </a>
-    <a href="{{ url_for('routes') }}" class="nav-item {% if request.endpoint in ['routes','route_new','route_edit'] %}active{% endif %}">
-      <span class="nav-icon">🗺️</span> ルート管理
-    </a>
-    <a href="{{ url_for('drivers') }}" class="nav-item {% if request.endpoint in ['drivers','driver_new','driver_edit'] %}active{% endif %}">
-      <span class="nav-icon">👤</span> ドライバー管理
-    </a>
-  </nav>
-  <div class="sidebar-footer">
-    <div class="user-info">
-      <div class="user-avatar">{{ session.get('staff_name', '管')[:1] }}</div>
-      <div>
-        <div class="user-name">{{ session.get('staff_name', '管理者') }}</div>
-        <div class="user-tenant">管理者</div>
-      </div>
-    </div>
-    <a href="{{ url_for('logout') }}"><button class="logout-btn">ログアウト</button></a>
+  <div class="topbar-user">
+    <div class="topbar-avatar">{{ session.get('staff_name', '管')[:1] }}</div>
+    <span class="topbar-username">{{ session.get('staff_name', '管理者') }}</span>
+    <a href="{{ url_for('logout') }}"><button class="topbar-logout">ログアウト</button></a>
   </div>
-</div>
+</header>
+
+<!-- メインコンテンツ -->
 <div class="main">
   <div class="content">
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -164,6 +143,25 @@
     {% block content %}{% endblock %}
   </div>
 </div>
+
+<!-- ボトムナビゲーション -->
+<nav class="bottom-nav">
+  <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">
+    <span class="nav-icon">📊</span>ダッシュボード
+  </a>
+  <a href="{{ url_for('history') }}" class="{% if request.endpoint == 'history' %}active{% endif %}">
+    <span class="nav-icon">📋</span>運行履歴
+  </a>
+  <a href="{{ url_for('trucks') }}" class="{% if request.endpoint in ['trucks','truck_new','truck_edit'] %}active{% endif %}">
+    <span class="nav-icon">🚛</span>トラック
+  </a>
+  <a href="{{ url_for('routes') }}" class="{% if request.endpoint in ['routes','route_new','route_edit'] %}active{% endif %}">
+    <span class="nav-icon">🗺️</span>ルート
+  </a>
+  <a href="{{ url_for('drivers') }}" class="{% if request.endpoint in ['drivers','driver_new','driver_edit'] %}active{% endif %}">
+    <span class="nav-icon">👤</span>ドライバー
+  </a>
+</nav>
 {% endblock %}
 </body>
 </html>
