@@ -13,6 +13,8 @@ import {
   Alert,
   ActivityIndicator,
   Switch,
+  Linking,
+  Platform,
 } from "react-native";
 import { useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -308,6 +310,43 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* APKダウンロード（Androidのみ表示） */}
+        {Platform.OS === "android" && (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.cardHeader}>
+              <View style={[styles.logoSmall, { backgroundColor: "#3ddc84" }]}>
+                <IconSymbol name="arrow.down.circle.fill" size={20} color="#ffffff" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.cardTitle, { color: colors.foreground }]}>アプリ更新</Text>
+                <Text style={[styles.cardSubtitle, { color: colors.muted }]}>最新版のAPKをダウンロード</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={[styles.downloadButton, { backgroundColor: "#3ddc84" }]}
+              onPress={() => {
+                Alert.alert(
+                  "APKダウンロード",
+                  "最新版のAndroidアプリをダウンロードします。\nブラウザが開きますので、APKファイルをダウンロードしてインストールしてください。",
+                  [
+                    { text: "キャンセル", style: "cancel" },
+                    {
+                      text: "ダウンロード",
+                      onPress: () => Linking.openURL("https://expo.dev/accounts/system.asayama/projects/truck-operation-app/builds/fe2d8cfa-4367-4d04-a216-66d41751901f"),
+                    },
+                  ]
+                );
+              }}
+            >
+              <IconSymbol name="arrow.down.circle.fill" size={20} color="#ffffff" />
+              <Text style={styles.downloadButtonText}>最新APKをダウンロード</Text>
+            </TouchableOpacity>
+            <Text style={[styles.downloadNote, { color: colors.muted }]}>
+              ※ インストール前に「提供元不明のアプリ」を許可してください
+            </Text>
+          </View>
+        )}
+
         {/* アプリ情報 */}
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>アプリ情報</Text>
@@ -361,4 +400,7 @@ const styles = StyleSheet.create({
   settingRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 4 },
   settingInfo: { flexDirection: "row", alignItems: "center", gap: 10 },
   settingLabel: { fontSize: 15 },
+  downloadButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 14, borderRadius: 14, gap: 8 },
+  downloadButtonText: { color: "#ffffff", fontSize: 15, fontWeight: "700" },
+  downloadNote: { fontSize: 12, textAlign: "center", lineHeight: 18 },
 });
