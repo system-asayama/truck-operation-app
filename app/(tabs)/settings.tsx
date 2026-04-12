@@ -325,6 +325,13 @@ export default function SettingsScreen() {
             <TouchableOpacity
               style={[styles.downloadButton, { backgroundColor: "#3ddc84" }]}
               onPress={() => {
+                // ログイン済みの場合はサーバーエンドポイントを使用、未ログインの場合はデフォルトURLを使用
+                const currentApiUrl = driverInfo?.apiUrl ?? DEFAULT_API_URL;
+                const currentTenantSlug = driverInfo?.tenantSlug ?? DEFAULT_TENANT_SLUG;
+                const currentApiKey = driverInfo?.mobileApiKey ?? DEFAULT_MOBILE_API_KEY;
+                // サーバーエンドポイント（永続 URL）を構築
+                // 注意: ブラウザからのダウンロードのため、APIKeyはクエリパラメータで渡す
+                const downloadUrl = `${currentApiUrl}/api/mobile/truck_apk_download?tenant_slug=${currentTenantSlug}&api_key=${encodeURIComponent(currentApiKey)}`;
                 Alert.alert(
                   "APKダウンロード",
                   "最新版のAndroidアプリをダウンロードします。\nブラウザが開きますので、APKファイルをダウンロードしてインストールしてください。",
@@ -332,7 +339,7 @@ export default function SettingsScreen() {
                     { text: "キャンセル", style: "cancel" },
                     {
                       text: "ダウンロード",
-                      onPress: () => Linking.openURL("https://expo.dev/accounts/system.asayama/projects/truck-operation-app/builds/fe2d8cfa-4367-4d04-a216-66d41751901f"),
+                      onPress: () => Linking.openURL(downloadUrl),
                     },
                   ]
                 );
