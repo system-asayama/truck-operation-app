@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>マイページ - トラック運行管理</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif; background: #f3f4f6; color: #1e293b; }
+
+    /* トップバー */
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; height: 56px;
+      background: linear-gradient(90deg, #0f2744 0%, #1a3a5c 100%);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 16px; z-index: 200; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .topbar-brand { display: flex; align-items: center; gap: 8px; }
+    .topbar-icon { font-size: 22px; }
+    .topbar-title { font-size: 16px; font-weight: 700; color: #fff; }
+    .topbar-user { display: flex; align-items: center; gap: 8px; }
+    .topbar-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: rgba(255,255,255,0.25); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700;
+    }
+    .topbar-name { font-size: 13px; color: rgba(255,255,255,0.85); }
+    .topbar-logout {
+      background: rgba(255,255,255,0.15); color: #fff;
+      border: 1px solid rgba(255,255,255,0.3); border-radius: 6px;
+      padding: 5px 10px; font-size: 12px; cursor: pointer; font-family: inherit;
+      text-decoration: none;
+    }
+
+    /* メインコンテンツ */
+    .main { padding-top: 72px; padding-bottom: 32px; min-height: 100vh; }
+    .content { padding: 16px; max-width: 600px; margin: 0 auto; }
+
+    /* ヒーローカード */
+    .hero-card {
+      background: linear-gradient(135deg, #1a3a5c 0%, #0f2744 100%);
+      border-radius: 16px; padding: 20px; margin-bottom: 20px;
+      color: #fff; box-shadow: 0 4px 16px rgba(15,39,68,0.3);
+    }
+    .hero-name { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+    .hero-date { font-size: 13px; color: rgba(255,255,255,0.7); margin-bottom: 14px; }
+    .hero-status {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(255,255,255,0.15); border-radius: 20px;
+      padding: 6px 14px; font-size: 13px; font-weight: 600;
+    }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; }
+    .status-dot.active { background: #4ade80; }
+
+    /* セクションタイトル */
+    .section-title {
+      font-size: 15px; font-weight: 700; color: #0f2744;
+      margin-bottom: 12px; display: flex; align-items: center; gap: 6px;
+    }
+
+    /* カード */
+    .card {
+      background: #fff; border-radius: 14px; padding: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07); margin-bottom: 16px;
+    }
+
+    /* 運行カード */
+    .op-card {
+      background: #fff; border-radius: 12px; padding: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07); margin-bottom: 10px;
+      border-left: 4px solid #1a3a5c;
+    }
+    .op-truck { font-size: 15px; font-weight: 700; color: #0f2744; margin-bottom: 4px; }
+    .op-route { font-size: 13px; color: #6b7280; margin-bottom: 8px; }
+    .op-badge {
+      display: inline-block; padding: 3px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 600; color: #fff;
+    }
+    .op-time { font-size: 12px; color: #9ca3af; margin-top: 6px; }
+
+    /* 空状態 */
+    .empty-state {
+      text-align: center; padding: 36px 20px; color: #9ca3af;
+    }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-text { font-size: 14px; font-weight: 600; color: #6b7280; margin-bottom: 4px; }
+    .empty-sub { font-size: 12px; }
+
+    /* APKダウンロードカード */
+    .apk-card {
+      background: #fff; border-radius: 14px; padding: 18px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07); margin-bottom: 16px;
+      border: 1.5px solid #d1fae5;
+    }
+    .apk-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .apk-icon { font-size: 28px; }
+    .apk-title { font-size: 15px; font-weight: 700; color: #0f2744; }
+    .apk-version { font-size: 12px; color: #6b7280; margin-top: 2px; }
+    .apk-desc { font-size: 13px; color: #6b7280; margin-bottom: 14px; line-height: 1.5; }
+    .btn-apk {
+      display: block; width: 100%; padding: 14px;
+      background: linear-gradient(135deg, #059669 0%, #047857 100%);
+      color: #fff; border: none; border-radius: 12px;
+      font-size: 15px; font-weight: 700; font-family: inherit;
+      cursor: pointer; text-align: center; text-decoration: none;
+      box-shadow: 0 4px 12px rgba(5,150,105,0.3);
+      transition: opacity 0.15s;
+    }
+    .btn-apk:active { opacity: 0.85; }
+    .apk-note { font-size: 11px; color: #9ca3af; margin-top: 10px; text-align: center; }
+
+    /* ボトムナビ */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #fff; border-top: 1px solid #e5e7eb;
+      display: flex; z-index: 200;
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
+    }
+    .bottom-nav a {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      padding: 8px 4px 10px; font-size: 10px; color: #9ca3af;
+      border-top: 2px solid transparent; text-decoration: none;
+    }
+    .bottom-nav a.active { color: #1a3a5c; border-top-color: #1a3a5c; }
+    .nav-icon { font-size: 20px; margin-bottom: 2px; }
+  </style>
+</head>
+<body>
+
+<!-- トップバー -->
+<header class="topbar">
+  <div class="topbar-brand">
+    <span class="topbar-icon">🚛</span>
+    <span class="topbar-title">マイページ</span>
+  </div>
+  <div class="topbar-user">
+    <div class="topbar-avatar">{{ driver.name[:1] }}</div>
+    <span class="topbar-name">{{ driver.name }}</span>
+    <a href="{{ url_for('driver_logout') }}" class="topbar-logout">ログアウト</a>
+  </div>
+</header>
+
+<!-- メインコンテンツ -->
+<div class="main">
+  <div class="content">
+
+    <!-- ヒーローカード -->
+    <div class="hero-card">
+      <div class="hero-name">{{ driver.name }} さん</div>
+      <div class="hero-date">{{ today_str }}</div>
+      {% if operations %}
+        <div class="hero-status">
+          <span class="status-dot active"></span>
+          本日の運行あり（{{ operations|length }}件）
+        </div>
+      {% else %}
+        <div class="hero-status">
+          <span class="status-dot"></span>
+          本日の運行なし
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- 今日の運行予定 -->
+    <div class="section-title">📅 今日の運行予定</div>
+    {% if operations %}
+      {% for op in operations %}
+      <div class="op-card">
+        <div class="op-truck">🚛 {{ op.truck.number }} {{ op.truck.name }}</div>
+        <div class="op-route">{% if op.route %}{{ op.route.name }}{% else %}ルート未設定{% endif %}</div>
+        <span class="op-badge" style="background: {{ status_color(op.status) }}">{{ format_status(op.status) }}</span>
+        {% if op.start_time %}
+        <div class="op-time">出発: {{ format_time(op.start_time) }}{% if op.end_time %} → 終了: {{ format_time(op.end_time) }}{% endif %}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="card">
+        <div class="empty-state">
+          <div class="empty-icon">📬</div>
+          <div class="empty-text">本日の運行予定はありません</div>
+          <div class="empty-sub">管理者が運行を登録すると表示されます</div>
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- APKダウンロード -->
+    {% if apk_url %}
+    <div class="section-title">📱 アプリ</div>
+    <div class="apk-card">
+      <div class="apk-header">
+        <div class="apk-icon">🤖</div>
+        <div>
+          <div class="apk-title">Androidアプリ</div>
+          {% if apk_version %}<div class="apk-version">バージョン {{ apk_version }}</div>{% endif %}
+        </div>
+      </div>
+      <div class="apk-desc">
+        トラック運行管理アプリのAndroid版です。インストールするとGPS追跡や運行記録をスマートフォンから操作できます。
+      </div>
+      <a href="{{ url_for('driver_apk_download') }}" class="btn-apk">
+        ⬇️ Androidアプリをダウンロード
+      </a>
+      <div class="apk-note">※ インストール時に「提供元不明のアプリ」の許可が必要です</div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<!-- ボトムナビ -->
+<nav class="bottom-nav">
+  <a href="{{ url_for('driver_dashboard') }}" class="active">
+    <span class="nav-icon">🏠</span>ホーム
+  </a>
+  <a href="{{ url_for('driver_dashboard') }}">
+    <span class="nav-icon">🚛</span>運行
+  </a>
+  <a href="{{ url_for('driver_dashboard') }}">
+    <span class="nav-icon">📋</span>履歴
+  </a>
+</nav>
+
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ドライバーログイン - トラック運行管理</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif; background: #0f2744; color: #1e293b; }
+    .login-wrap {
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; padding: 24px;
+    }
+    .login-logo { font-size: 64px; margin-bottom: 8px; }
+    .login-title { font-size: 22px; font-weight: 800; color: #fff; margin-bottom: 4px; }
+    .login-subtitle { font-size: 13px; color: rgba(255,255,255,0.6); margin-bottom: 32px; }
+    .login-card {
+      background: #fff; border-radius: 20px; padding: 28px 24px;
+      width: 100%; max-width: 360px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .login-card-title { font-size: 17px; font-weight: 700; color: #1e293b; margin-bottom: 20px; }
+    .form-field { margin-bottom: 16px; }
+    .form-field label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+    .form-field input {
+      width: 100%; padding: 14px; border: 1.5px solid #e2e8f0; border-radius: 10px;
+      font-size: 16px; font-family: inherit; color: #1e293b; background: #f8fafc;
+      -webkit-appearance: none;
+    }
+    .form-field input:focus { outline: none; border-color: #2563eb; background: #fff; }
+    .btn-login {
+      width: 100%; padding: 15px; border-radius: 12px; border: none;
+      background: #1a3a5c; color: #fff; font-size: 16px; font-weight: 700;
+      cursor: pointer; font-family: inherit; margin-top: 8px;
+      transition: opacity 0.15s;
+    }
+    .btn-login:active { opacity: 0.8; }
+    .error-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 12px 14px; color: #dc2626; font-size: 13px; margin-bottom: 16px; }
+    .admin-link { text-align: center; margin-top: 20px; }
+    .admin-link a { font-size: 12px; color: rgba(255,255,255,0.5); text-decoration: none; }
+    .admin-link a:hover { color: rgba(255,255,255,0.8); }
+  </style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-logo">🚛</div>
+  <div class="login-title">トラック運行管理</div>
+  <div class="login-subtitle">ドライバーマイページ</div>
+  <div class="login-card">
+    <div class="login-card-title">ログイン</div>
+    {% if error %}
+    <div class="error-box">{{ error }}</div>
+    {% endif %}
+    <form method="post">
+      <div class="form-field">
+        <label for="login_id">ログインID</label>
+        <input type="text" id="login_id" name="login_id" placeholder="ログインID" autocomplete="username" autocapitalize="none" value="">
+      </div>
+      <div class="form-field">
+        <label for="password">パスワード</label>
+        <input type="password" id="password" name="password" placeholder="パスワード" autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn-login">ログイン</button>
+    </form>
+  </div>
+  <div class="admin-link">
+    <a href="{{ url_for('login') }}">管理者ログインはこちら</a>
+  </div>
+</div>
+</body>
+</html>

@@ -133,6 +133,28 @@ class Operation(db.Model):
         }
 
 
+class AppSettings(db.Model):
+    __tablename__ = "app_settings"
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(100), nullable=False, unique=True)
+    value = db.Column(db.Text)
+
+    @classmethod
+    def get(cls, key, default=None):
+        row = cls.query.filter_by(key=key).first()
+        return row.value if row else default
+
+    @classmethod
+    def set(cls, key, value):
+        row = cls.query.filter_by(key=key).first()
+        if row:
+            row.value = value
+        else:
+            row = cls(key=key, value=value)
+            db.session.add(row)
+        db.session.commit()
+
+
 # ─── ヘルパー ────────────────────────────────────────────
 
 def vps_login(login_id, password):
@@ -616,6 +638,103 @@ def mobile_operation_status():
         op.end_time = datetime.now()
     db.session.commit()
     return jsonify({"ok": True})
+
+
+# ─── ドライバーマイページ ──────────────────────────────────
+
+def driver_login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "driver_id" not in session:
+            return redirect(url_for("driver_login"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.route("/driver/login", methods=["GET", "POST"])
+def driver_login():
+    from werkzeug.security import check_password_hash
+    error = None
+    if request.method == "POST":
+        login_id = request.form.get("login_id", "").strip()
+        password = request.form.get("password", "")
+        driver = Driver.query.filter_by(login_id=login_id, active=True).first()
+        if driver and check_password_hash(driver.password_hash, password):
+            session["driver_id"] = driver.id
+            session["driver_name"] = driver.name
+            return redirect(url_for("driver_dashboard"))
+        else:
+            error = "ログインIDまたはパスワードが正しくありません"
+    return render_template("driver/login.html", error=error)
+
+
+@app.route("/driver/logout")
+def driver_logout():
+    session.pop("driver_id", None)
+    session.pop("driver_name", None)
+    return redirect(url_for("driver_login"))
+
+
+@app.route("/driver/dashboard")
+@driver_login_required
+def driver_dashboard():
+    driver_id = session["driver_id"]
+    driver = Driver.query.get(driver_id)
+    today = date.today()
+    today_str = today.strftime("%Y年%m月%d日")
+    operations = Operation.query.filter_by(
+        driver_id=driver_id,
+        operation_date=today
+    ).order_by(Operation.start_time).all()
+    apk_url = AppSettings.get("android_apk_url", "")
+    apk_version = AppSettings.get("android_apk_version", "")
+    return render_template(
+        "driver/dashboard.html",
+        driver=driver,
+        today_str=today_str,
+        operations=operations,
+        apk_url=apk_url,
+        apk_version=apk_version,
+    )
+
+
+@app.route("/driver/apk_download")
+@driver_login_required
+def driver_apk_download():
+    apk_url = AppSettings.get("android_apk_url", "")
+    if not apk_url:
+        return "APKが設定されていません", 404
+    try:
+        resp = requests.get(apk_url, stream=True, timeout=30)
+        from flask import Response, stream_with_context
+        def generate():
+            for chunk in resp.iter_content(chunk_size=8192):
+                yield chunk
+        filename = "truck-operation-app.apk"
+        return Response(
+            stream_with_context(generate()),
+            content_type="application/vnd.android.package-archive",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+    except Exception as e:
+        return f"ダウンロードエラー: {e}", 500
+
+
+# ─── APK設定（管理者）──────────────────────────────────────
+
+@app.route("/settings/apk", methods=["GET", "POST"])
+@login_required
+def apk_settings():
+    if request.method == "POST":
+        apk_url = request.form.get("apk_url", "").strip()
+        apk_version = request.form.get("apk_version", "").strip()
+        AppSettings.set("android_apk_url", apk_url)
+        AppSettings.set("android_apk_version", apk_version)
+        flash("APK設定を保存しました", "success")
+        return redirect(url_for("apk_settings"))
+    apk_url = AppSettings.get("android_apk_url", "")
+    apk_version = AppSettings.get("android_apk_version", "")
+    return render_template("admin/apk_settings.html", apk_url=apk_url, apk_version=apk_version)
 
 
 # ─── DB初期化 ────────────────────────────────────────────
