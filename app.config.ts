@@ -141,7 +141,7 @@ const config: ExpoConfig = {
           minSdkVersion: 24,
           compileSdkVersion: 35,
           targetSdkVersion: 35,
-          kotlinVersion: "1.9.25",
+          kotlinVersion: "2.1.21",
         },
       },
     ],
