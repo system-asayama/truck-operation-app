@@ -22,13 +22,20 @@ app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
-# VPS APIの設定（ログイン認証のみ使用）
-VPS_API_URL = os.environ.get("VPS_API_URL", "https://samurai-hub.com")
 MOBILE_API_KEY = os.environ.get("MOBILE_API_KEY", "truck-app-key")
-TENANT_SLUG = os.environ.get("TENANT_SLUG", "zeioks")
+ADMIN_INITIAL_PASSWORD = os.environ.get("ADMIN_INITIAL_PASSWORD", "admin123456")
 
 
 # ─── DBモデル ───────────────────────────────────────────
+
+class Admin(db.Model):
+    __tablename__ = "admins"
+    id = db.Column(db.Integer, primary_key=True)
+    login_id = db.Column(db.String(100), nullable=False, unique=True)
+    password_hash = db.Column(db.String(256), nullable=False)
+    name = db.Column(db.String(100), nullable=False, default="管理者")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 
 class Truck(db.Model):
     __tablename__ = "trucks"
@@ -157,22 +164,13 @@ class AppSettings(db.Model):
 
 # ─── ヘルパー ────────────────────────────────────────────
 
-def vps_login(login_id, password):
-    """VPS APIでログイン認証（管理者のみ）"""
-    url = f"{VPS_API_URL}/api/mobile/auth/login"
-    headers = {
-        "Content-Type": "application/json",
-        "X-Mobile-API-Key": MOBILE_API_KEY,
-    }
-    try:
-        resp = requests.post(url, headers=headers, json={
-            "login_id": login_id,
-            "password": password,
-            "tenant_slug": TENANT_SLUG,
-        }, timeout=10)
-        return resp.json()
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+def admin_login(login_id, password):
+    """管理者ローカル認証"""
+    from werkzeug.security import check_password_hash
+    admin = Admin.query.filter_by(login_id=login_id).first()
+    if admin and check_password_hash(admin.password_hash, password):
+        return {"ok": True, "staff_token": f"admin:{admin.id}", "staff_id": admin.id, "name": admin.name}
+    return {"ok": False, "error": "ログインIDまたはパスワードが正しくありません"}
 
 
 def make_driver_token(driver_id):
@@ -267,7 +265,7 @@ def login():
     if request.method == "POST":
         login_id = request.form.get("login_id", "").strip()
         password = request.form.get("password", "")
-        result = vps_login(login_id, password)
+        result = admin_login(login_id, password)
         if result.get("ok"):
             session["staff_token"] = result["staff_token"]
             session["staff_id"] = result["staff_id"]
@@ -748,6 +746,17 @@ def init_db():
 with app.app_context():
     try:
         db.create_all()
+        # 管理者アカウントが存在しない場合は初期アカウントを作成
+        from werkzeug.security import generate_password_hash
+        if Admin.query.count() == 0:
+            admin = Admin(
+                login_id="admin",
+                password_hash=generate_password_hash(ADMIN_INITIAL_PASSWORD),
+                name="管理者",
+            )
+            db.session.add(admin)
+            db.session.commit()
+            print(f"初期管理者アカウントを作成しました: admin / {ADMIN_INITIAL_PASSWORD}")
     except Exception as e:
         print(f"DB init error: {e}")
 
