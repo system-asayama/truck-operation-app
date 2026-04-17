@@ -7,7 +7,9 @@ from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from dotenv import load_dotenv
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text
+from sqlalchemy import text, create_engine
+from sqlalchemy.orm import sessionmaker
+from datetime import timedelta
 
 load_dotenv()
 
@@ -24,6 +26,24 @@ db = SQLAlchemy(app)
 
 MOBILE_API_KEY = os.environ.get("MOBILE_API_KEY", "truck-app-key")
 ADMIN_INITIAL_PASSWORD = os.environ.get("ADMIN_INITIAL_PASSWORD", "admin123456")
+
+# ─── samurai-hub.com メインDB接続（GPS位置情報取得用）────────
+SAMURAI_HUB_DATABASE_URL = os.environ.get("SAMURAI_HUB_DATABASE_URL", "")
+if SAMURAI_HUB_DATABASE_URL.startswith("postgres://"):
+    SAMURAI_HUB_DATABASE_URL = SAMURAI_HUB_DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+_hub_engine = None
+_HubSession = None
+
+def get_hub_session():
+    """samurai-hub.com のメインDBセッションを返す"""
+    global _hub_engine, _HubSession
+    if not SAMURAI_HUB_DATABASE_URL:
+        return None
+    if _hub_engine is None:
+        _hub_engine = create_engine(SAMURAI_HUB_DATABASE_URL, pool_pre_ping=True)
+        _HubSession = sessionmaker(bind=_hub_engine)
+    return _HubSession()
 
 
 # ─── DBモデル ───────────────────────────────────────────
@@ -716,6 +736,232 @@ def driver_apk_download():
         )
     except Exception as e:
         return f"ダウンロードエラー: {e}", 500
+
+
+# ─── GPS位置確認（トラックドライバー）──────────────────────────
+
+@app.route("/gps_map")
+@login_required
+def gps_map():
+    """トラックドライバーのGPS位置確認ページ"""
+    hub = get_hub_session()
+    if hub is None:
+        return render_template("admin/gps_map.html",
+                               tracks_data=[],
+                               driver_list=[],
+                               target_date=date.today(),
+                               date_str=date.today().strftime('%Y-%m-%d'),
+                               selected_driver_id=None,
+                               error="SAMURAI_HUB_DATABASE_URL が設定されていません")
+    try:
+        today = date.today()
+        date_str = request.args.get('date', today.strftime('%Y-%m-%d'))
+        try:
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except Exception:
+            target_date = today
+        driver_id_param = request.args.get('driver_id')
+
+        # ドライバー一覧を取得（truck-operation-app のローカルDBから）
+        drivers = Driver.query.filter_by(active=True).order_by(Driver.name).all()
+        # ドライバーのlogin_idとstaffIdのマッピングを取得
+        # samurai-hub.com のT_従業員テーブルからlogin_idで検索
+        driver_login_ids = [d.login_id for d in drivers]
+
+        # T_従業員テーブルからドライバーのstaff_idを取得
+        driver_staff_map = {}  # login_id -> {staff_id, name, tenant_id}
+        if driver_login_ids:
+            placeholders = ','.join([f"'{lid}'" for lid in driver_login_ids])
+            rows = hub.execute(text(f"""
+                SELECT id, login_id, name, tenant_id
+                FROM \"T_従業員\"
+                WHERE login_id IN ({placeholders}) AND active = 1
+            """)).fetchall()
+            for row in rows:
+                driver_staff_map[row[1]] = {'staff_id': row[0], 'name': row[2], 'tenant_id': row[3]}
+
+        # driver_listを構築（ドライバー名とstaff_idのマッピング）
+        driver_list = []
+        for d in drivers:
+            info = driver_staff_map.get(d.login_id)
+            driver_list.append({
+                'id': d.id,
+                'name': d.name,
+                'login_id': d.login_id,
+                'staff_id': info['staff_id'] if info else None,
+                'tenant_id': info['tenant_id'] if info else None,
+            })
+
+        # 対象ドライバーのstaff_idリストを収集
+        if driver_id_param:
+            try:
+                sel_driver_id = int(driver_id_param)
+                target_drivers = [dl for dl in driver_list if dl['id'] == sel_driver_id]
+            except ValueError:
+                target_drivers = driver_list
+        else:
+            target_drivers = driver_list
+
+        staff_ids = [dl['staff_id'] for dl in target_drivers if dl['staff_id'] is not None]
+
+        # GPS位置履歴を取得
+        staff_tracks = {}
+        if staff_ids:
+            ids_str = ','.join(str(sid) for sid in staff_ids)
+            dt_start = datetime.combine(target_date, datetime.min.time())
+            dt_end = datetime.combine(target_date + timedelta(days=1), datetime.min.time())
+            locs = hub.execute(text(f"""
+                SELECT staff_id, staff_type, latitude, longitude, accuracy, recorded_at
+                FROM \"T_勤怠位置履歴\"
+                WHERE staff_id IN ({ids_str})
+                  AND recorded_at >= :dt_start
+                  AND recorded_at < :dt_end
+                ORDER BY staff_id ASC, recorded_at ASC
+            """), {'dt_start': dt_start, 'dt_end': dt_end}).fetchall()
+            for loc in locs:
+                key = loc[0]  # staff_id
+                if key not in staff_tracks:
+                    staff_tracks[key] = []
+                staff_tracks[key].append({
+                    'lat': float(loc[2]),
+                    'lng': float(loc[3]),
+                    'time': loc[5].strftime('%H:%M:%S') if loc[5] else ''
+                })
+
+        # tracks_dataを構築
+        tracks_data = []
+        for dl in target_drivers:
+            if dl['staff_id'] is None:
+                continue
+            pts = staff_tracks.get(dl['staff_id'], [])
+            tracks_data.append({
+                'driver_id': dl['id'],
+                'staff_id': dl['staff_id'],
+                'staff_name': dl['name'],
+                'staff_type': 'employee',
+                'gps_mode': 'always',
+                'clock_in': None,
+                'clock_out': None,
+                'break_start': None,
+                'break_end': None,
+                'points': pts,
+                'point_count': len(pts)
+            })
+        tracks_data.sort(key=lambda x: -x['point_count'])
+
+        return render_template("admin/gps_map.html",
+                               tracks_data=tracks_data,
+                               driver_list=driver_list,
+                               target_date=target_date,
+                               date_str=date_str,
+                               selected_driver_id=driver_id_param,
+                               error=None)
+    except Exception as e:
+        return render_template("admin/gps_map.html",
+                               tracks_data=[],
+                               driver_list=[],
+                               target_date=date.today(),
+                               date_str=date.today().strftime('%Y-%m-%d'),
+                               selected_driver_id=None,
+                               error=str(e))
+    finally:
+        hub.close()
+
+
+@app.route("/gps_map/realtime_data")
+@login_required
+def gps_map_realtime_data():
+    """リアルタイム地図データAPI（地図画面がポーリングする）"""
+    hub = get_hub_session()
+    if hub is None:
+        return jsonify({'ok': False, 'error': 'SAMURAI_HUB_DATABASE_URL が設定されていません'}), 500
+    try:
+        date_str = request.args.get('date', date.today().strftime('%Y-%m-%d'))
+        try:
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except Exception:
+            target_date = date.today()
+        driver_id_param = request.args.get('driver_id')
+
+        drivers = Driver.query.filter_by(active=True).all()
+        driver_login_ids = [d.login_id for d in drivers]
+        driver_staff_map = {}
+        if driver_login_ids:
+            placeholders = ','.join([f"'{lid}'" for lid in driver_login_ids])
+            rows = hub.execute(text(f"""
+                SELECT id, login_id, name, tenant_id
+                FROM \"T_従業員\"
+                WHERE login_id IN ({placeholders}) AND active = 1
+            """)).fetchall()
+            for row in rows:
+                driver_staff_map[row[1]] = {'staff_id': row[0], 'name': row[2], 'tenant_id': row[3]}
+
+        driver_list = []
+        for d in drivers:
+            info = driver_staff_map.get(d.login_id)
+            driver_list.append({
+                'id': d.id,
+                'name': d.name,
+                'login_id': d.login_id,
+                'staff_id': info['staff_id'] if info else None,
+            })
+
+        if driver_id_param:
+            try:
+                sel_id = int(driver_id_param)
+                target_drivers = [dl for dl in driver_list if dl['id'] == sel_id]
+            except ValueError:
+                target_drivers = driver_list
+        else:
+            target_drivers = driver_list
+
+        staff_ids = [dl['staff_id'] for dl in target_drivers if dl['staff_id'] is not None]
+        staff_tracks = {}
+        if staff_ids:
+            ids_str = ','.join(str(sid) for sid in staff_ids)
+            dt_start = datetime.combine(target_date, datetime.min.time())
+            dt_end = datetime.combine(target_date + timedelta(days=1), datetime.min.time())
+            locs = hub.execute(text(f"""
+                SELECT staff_id, latitude, longitude, recorded_at
+                FROM \"T_勤怠位置履歴\"
+                WHERE staff_id IN ({ids_str})
+                  AND recorded_at >= :dt_start
+                  AND recorded_at < :dt_end
+                ORDER BY staff_id ASC, recorded_at ASC
+            """), {'dt_start': dt_start, 'dt_end': dt_end}).fetchall()
+            for loc in locs:
+                key = loc[0]
+                if key not in staff_tracks:
+                    staff_tracks[key] = []
+                staff_tracks[key].append({
+                    'lat': float(loc[1]),
+                    'lng': float(loc[2]),
+                    'time': loc[3].strftime('%H:%M:%S') if loc[3] else ''
+                })
+
+        tracks = []
+        for dl in target_drivers:
+            if dl['staff_id'] is None:
+                continue
+            pts = staff_tracks.get(dl['staff_id'], [])
+            if not pts:
+                continue
+            tracks.append({
+                'staff_id': dl['staff_id'],
+                'staff_type': 'employee',
+                'staff_name': dl['name'],
+                'gps_mode': 'always',
+                'clock_in': None,
+                'clock_out': None,
+                'break_start': None,
+                'break_end': None,
+                'points': pts
+            })
+        return jsonify({'ok': True, 'tracks': tracks})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+    finally:
+        hub.close()
 
 
 # ─── APK設定（管理者）──────────────────────────────────────

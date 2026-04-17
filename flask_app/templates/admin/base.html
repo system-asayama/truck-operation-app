@@ -161,6 +161,9 @@
   <a href="{{ url_for('drivers') }}" class="{% if request.endpoint in ['drivers','driver_new','driver_edit'] %}active{% endif %}">
     <span class="nav-icon">👤</span>ドライバー
   </a>
+  <a href="{{ url_for('gps_map') }}" class="{% if request.endpoint in ['gps_map','gps_map_realtime_data'] %}active{% endif %}">
+    <span class="nav-icon">📍</span>GPS
+  </a>
   <a href="{{ url_for('apk_settings') }}" class="{% if request.endpoint == 'apk_settings' %}active{% endif %}">
     <span class="nav-icon">📱</span>APK
   </a>

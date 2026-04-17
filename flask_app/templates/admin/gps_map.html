@@ -1,0 +1,462 @@
+{% extends "admin/base.html" %}
+{% block title %}GPS位置確認 - トラック運行管理{% endblock %}
+{% block extra_style %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    .map-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+    .map-toolbar label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #555;
+    }
+    .map-toolbar input[type="date"],
+    .map-toolbar select {
+        padding: 8px 12px;
+        border: 1px solid #d0d0d0;
+        border-radius: 7px;
+        font-size: 13px;
+        color: #333;
+        background: #fff;
+        outline: none;
+    }
+    .btn-filter {
+        background: #1a3a5c;
+        color: #fff;
+        border: none;
+        border-radius: 7px;
+        padding: 8px 20px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .btn-filter:hover { background: #0f2744; }
+
+    #map {
+        width: 100%;
+        height: 480px;
+        border-radius: 12px;
+        border: 1px solid #e0e0e0;
+        margin-bottom: 20px;
+        z-index: 0;
+    }
+
+    .driver-track-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+    .driver-track-card {
+        background: #fff;
+        border-radius: 10px;
+        border: 2px solid #e0e0e0;
+        padding: 14px 16px;
+        cursor: pointer;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .driver-track-card:hover {
+        border-color: #1a3a5c;
+        box-shadow: 0 2px 8px rgba(26,58,92,0.12);
+    }
+    .driver-track-card.active {
+        border-color: #1a3a5c;
+        background: #e8eef6;
+    }
+    .driver-track-name {
+        font-size: 14px;
+        font-weight: 700;
+        color: #1a3a5c;
+        margin-bottom: 4px;
+    }
+    .driver-track-meta {
+        font-size: 11px;
+        color: #888;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .driver-track-meta .badge {
+        background: #e8eef6;
+        color: #1a3a5c;
+        border-radius: 10px;
+        padding: 2px 8px;
+        font-weight: 600;
+    }
+    .driver-track-meta .badge.no-data {
+        background: #f5f5f5;
+        color: #aaa;
+    }
+    .no-data-msg {
+        text-align: center;
+        padding: 40px;
+        color: #aaa;
+        font-size: 14px;
+    }
+    .legend {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        font-size: 12px;
+        color: #555;
+        margin-bottom: 12px;
+        align-items: center;
+    }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-dot {
+        width: 14px; height: 14px; border-radius: 50%;
+        border: 2px solid rgba(0,0,0,0.15);
+        flex-shrink: 0;
+    }
+    .legend-line {
+        width: 28px; height: 4px; border-radius: 2px;
+        flex-shrink: 0;
+    }
+    /* リアルタイムボタン */
+    .btn-realtime {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 8px 16px;
+        border-radius: 8px;
+        border: 2px solid #1a3a5c;
+        background: #fff;
+        color: #1a3a5c;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .btn-realtime.active {
+        background: #e53935;
+        border-color: #e53935;
+        color: #fff;
+        animation: pulse-border 1.5s infinite;
+    }
+    .btn-realtime .rt-dot {
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        background: #1a3a5c;
+        transition: background 0.2s;
+    }
+    .btn-realtime.active .rt-dot {
+        background: #fff;
+        animation: blink 1s infinite;
+    }
+    @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.2; }
+    }
+    @keyframes pulse-border {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(229,57,53,0.4); }
+        50% { box-shadow: 0 0 0 6px rgba(229,57,53,0); }
+    }
+    .auto-refresh-badge {
+        font-size: 11px;
+        background: #e8f5e9;
+        color: #2e7d32;
+        border-radius: 10px;
+        padding: 2px 8px;
+        font-weight: 600;
+        display: none;
+    }
+    .auto-refresh-badge.visible { display: inline; }
+</style>
+{% endblock %}
+{% block content %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- ページヘッダー -->
+<div style="background:linear-gradient(135deg,#1a3a5c 0%,#2563a8 100%);color:#fff;border-radius:16px;padding:1.5rem 2rem;margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+  <div>
+    <div style="font-size:0.8rem;opacity:0.75;margin-bottom:0.2rem;letter-spacing:0.05em;">トラック運行管理</div>
+    <h1 style="margin:0;font-size:1.6rem;font-weight:700;color:#fff;">📍 GPS位置確認</h1>
+  </div>
+  <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+    <span class="auto-refresh-badge" id="autoRefreshBadge" style="font-size:0.75rem;background:rgba(255,255,255,0.2);color:#fff;border-radius:10px;padding:3px 10px;font-weight:600;display:none;">🔄 自動更新中</span>
+    <button class="btn-realtime" id="realtimeBtn" onclick="toggleRealtimeMode()">
+        <span class="rt-dot"></span>
+        <span id="realtimeBtnText">リアルタイム追跡</span>
+    </button>
+    <a href="{{ url_for('dashboard') }}" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:0.45rem 1rem;border-radius:8px;text-decoration:none;font-size:0.875rem;">← ダッシュボードへ</a>
+  </div>
+</div>
+
+{% if error %}
+<div class="error-box">⚠ {{ error }}</div>
+{% endif %}
+
+<!-- フィルターバー -->
+<form method="get" class="map-toolbar">
+    <label>日付</label>
+    <input type="date" name="date" value="{{ date_str }}">
+    <label>ドライバー</label>
+    <select name="driver_id">
+        <option value="">全員</option>
+        {% for d in driver_list %}
+        <option value="{{ d.id }}" {% if selected_driver_id == d.id|string %}selected{% endif %}>
+            {{ d.name }}
+        </option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="btn-filter">絞り込む</button>
+</form>
+
+<!-- 凡例 -->
+<div class="legend">
+    <div class="legend-item">
+        <div class="legend-line" style="background:#1a3a5c;"></div> 移動経路
+    </div>
+    <div class="legend-item">
+        <div class="legend-dot" style="background:#43a047;"></div> 出発地点
+    </div>
+    <div class="legend-item">
+        <div class="legend-dot" style="background:#ef5350;"></div> 最終地点
+    </div>
+</div>
+
+<!-- 地図 -->
+<div id="map"></div>
+
+<!-- ドライバーカード一覧 -->
+{% if tracks_data %}
+<div class="driver-track-list">
+    {% for t in tracks_data %}
+    <div class="driver-track-card {% if loop.first and t.point_count > 0 %}active{% endif %}"
+         id="card-{{ t.driver_id }}"
+         onclick="focusDriver({{ t.driver_id }}, {{ t.staff_id }})">
+        <div class="driver-track-name">🚛 {{ t.staff_name }}</div>
+        <div class="driver-track-meta">
+            {% if t.point_count > 0 %}
+            <span class="badge">📍 {{ t.point_count }}件</span>
+            {% else %}
+            <span class="badge no-data">位置データなし</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="no-data-msg">
+    {{ target_date.strftime('%Y年%m月%d日') }} の位置データはありません
+</div>
+{% endif %}
+
+<script>
+// ──────────────────────────────────────────────
+// 地図初期化
+// ──────────────────────────────────────────────
+const map = L.map('map').setView([35.6812, 139.7671], 13);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19
+}).addTo(map);
+
+const COLORS = [
+    '#1a3a5c', '#c62828', '#2e7d32', '#e65100',
+    '#4a148c', '#006064', '#827717', '#880e4f'
+];
+
+const tracksData = {{ tracks_data | tojson }};
+const layerGroups = {};
+
+function createCircleIcon(color, size, borderColor) {
+    borderColor = borderColor || '#fff';
+    return L.divIcon({
+        className: '',
+        html: `<div style="
+            width:${size}px; height:${size}px;
+            background:${color};
+            border-radius:50%;
+            border:3px solid ${borderColor};
+            box-shadow:0 2px 6px rgba(0,0,0,0.35);
+            box-sizing:border-box;
+        "></div>`,
+        iconSize: [size, size],
+        iconAnchor: [size/2, size/2],
+        popupAnchor: [0, -size/2]
+    });
+}
+
+function drawTrack(track, colorIndex) {
+    const color = COLORS[colorIndex % COLORS.length];
+    const key = 'driver-' + track.driver_id;
+    const group = L.layerGroup().addTo(map);
+    layerGroups[key] = { group, color, bounds: null };
+
+    if (!track.points || track.points.length === 0) return;
+
+    const latlngs = track.points.map(p => [p.lat, p.lng]);
+    const bounds = L.latLngBounds(latlngs);
+    layerGroups[key].bounds = bounds;
+
+    // 移動経路（ポリライン）
+    L.polyline(latlngs, {
+        color: color,
+        weight: 5,
+        opacity: 0.85,
+        lineJoin: 'round',
+        lineCap: 'round'
+    }).addTo(group);
+
+    // 出発地点（最初のポイント）
+    const firstPt = track.points[0];
+    L.marker([firstPt.lat, firstPt.lng], {
+        icon: createCircleIcon('#43a047', 18, '#fff')
+    }).bindPopup(
+        `<b>${track.staff_name}</b><br>🟢 出発地点<br>時刻: ${firstPt.time}`
+    ).addTo(group);
+
+    // 最終地点（最後のポイント）
+    if (track.points.length > 1) {
+        const lastPt = track.points[track.points.length - 1];
+        L.marker([lastPt.lat, lastPt.lng], {
+            icon: createCircleIcon('#ef5350', 18, '#fff')
+        }).bindPopup(
+            `<b>${track.staff_name}</b><br>🔴 最終地点<br>時刻: ${lastPt.time}`
+        ).addTo(group);
+    }
+}
+
+// 全トラックを描画
+let firstBounds = null;
+tracksData.forEach(function(track, i) {
+    drawTrack(track, i);
+    if (!firstBounds && track.points && track.points.length > 0) {
+        const latlngs = track.points.map(p => [p.lat, p.lng]);
+        firstBounds = L.latLngBounds(latlngs);
+    }
+});
+
+// 初期表示：データがあれば全体が見えるようにフィット
+if (firstBounds) {
+    const allPoints = [];
+    tracksData.forEach(function(t) {
+        if (t.points) t.points.forEach(function(p) { allPoints.push([p.lat, p.lng]); });
+    });
+    if (allPoints.length > 0) {
+        map.fitBounds(L.latLngBounds(allPoints), { padding: [30, 30] });
+    }
+}
+
+// ドライバーカードクリックで地図をフォーカス
+function focusDriver(driverId, staffId) {
+    const key = 'driver-' + driverId;
+    document.querySelectorAll('.driver-track-card').forEach(function(c) {
+        c.classList.remove('active');
+    });
+    const card = document.getElementById('card-' + driverId);
+    if (card) card.classList.add('active');
+
+    const layer = layerGroups[key];
+    if (layer && layer.bounds) {
+        map.fitBounds(layer.bounds, { padding: [40, 40] });
+    }
+}
+
+// ──────────────────────────────────────────────
+// リアルタイム追跡機能
+// ──────────────────────────────────────────────
+let realtimeEnabled = false;
+let realtimeTimer = null;
+const REALTIME_REFRESH_MS = 4000;
+
+function toggleRealtimeMode() {
+    realtimeEnabled = !realtimeEnabled;
+    updateRealtimeUI();
+    if (realtimeEnabled) {
+        startRealtimeRefresh();
+    } else {
+        stopRealtimeRefresh();
+    }
+}
+
+function updateRealtimeUI() {
+    const btn = document.getElementById('realtimeBtn');
+    const btnText = document.getElementById('realtimeBtnText');
+    const badge = document.getElementById('autoRefreshBadge');
+    if (realtimeEnabled) {
+        btn.classList.add('active');
+        btnText.textContent = 'リアルタイム ON';
+        badge.style.display = 'inline';
+    } else {
+        btn.classList.remove('active');
+        btnText.textContent = 'リアルタイム追跡';
+        badge.style.display = 'none';
+    }
+}
+
+function fetchLatestLocations() {
+    const url = new URL(window.location.href);
+    const params = new URLSearchParams(url.search);
+    const today = new Date();
+    const dateStr = today.getFullYear() + '-'
+        + String(today.getMonth()+1).padStart(2,'0') + '-'
+        + String(today.getDate()).padStart(2,'0');
+    const driverId = params.get('driver_id') || '';
+
+    const apiUrl = '/gps_map/realtime_data?date=' + dateStr + (driverId ? '&driver_id=' + driverId : '');
+    fetch(apiUrl)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.ok) return;
+
+            // 既存レイヤーを全て削除
+            Object.values(layerGroups).forEach(function(lg) {
+                if (lg.group) {
+                    try { lg.group.clearLayers(); } catch(e) {}
+                    try { lg.group.remove(); } catch(e) {}
+                }
+            });
+            Object.keys(layerGroups).forEach(function(k) { delete layerGroups[k]; });
+
+            // 新しいデータで再描画
+            let latestPoint = null;
+            data.tracks.forEach(function(t, idx) {
+                if (!t.points || t.points.length === 0) return;
+                // driver_idをstaff_idから逆引き
+                const driverEntry = tracksData.find(td => td.staff_id === t.staff_id);
+                if (driverEntry) {
+                    t.driver_id = driverEntry.driver_id;
+                } else {
+                    t.driver_id = t.staff_id;
+                }
+                drawTrack(t, idx);
+                latestPoint = [t.points[t.points.length - 1].lat, t.points[t.points.length - 1].lng];
+
+                // カードの件数を更新
+                const cardEl = document.getElementById('card-' + t.driver_id);
+                if (cardEl) {
+                    const pointBadge = cardEl.querySelector('.badge');
+                    if (pointBadge) pointBadge.textContent = '📍 ' + t.points.length + '件';
+                }
+            });
+
+            if (latestPoint) {
+                map.panTo(latestPoint, { animate: true, duration: 0.5 });
+            }
+        })
+        .catch(function() {});
+}
+
+function startRealtimeRefresh() {
+    fetchLatestLocations();
+    realtimeTimer = setInterval(fetchLatestLocations, REALTIME_REFRESH_MS);
+}
+
+function stopRealtimeRefresh() {
+    if (realtimeTimer) { clearInterval(realtimeTimer); realtimeTimer = null; }
+}
+
+window.addEventListener('beforeunload', function() {
+    stopRealtimeRefresh();
+});
+</script>
+{% endblock %}
