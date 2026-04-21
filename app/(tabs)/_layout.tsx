@@ -29,6 +29,13 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
+        name="settings"
+        options={{
+          title: "ログイン",
+          tabBarIcon: ({ color }) => <IconSymbol size={26} name="person.circle.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="index"
         options={{
           title: "運行",
@@ -40,13 +47,6 @@ export default function TabLayout() {
         options={{
           title: "履歴",
           tabBarIcon: ({ color }) => <IconSymbol size={26} name="doc.text.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: "設定",
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="gear" color={color} />,
         }}
       />
     </Tabs>
