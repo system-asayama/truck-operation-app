@@ -29,6 +29,8 @@ import {
   loginTruckDriver,
   clearTruckDriverInfo,
   saveTruckDriverInfo,
+  getSavedServerSettings,
+  saveServerSettings,
   type TruckDriverInfo,
   DEFAULT_API_URL,
   DEFAULT_TENANT_SLUG,
@@ -56,6 +58,10 @@ export default function SettingsScreen() {
   const loadDriverInfo = useCallback(async () => {
     const info = await getTruckDriverInfo();
     setDriverInfo(info);
+    // 保存済みのサーバー設定を読み込む（ログアウト後も保持）
+    const saved = await getSavedServerSettings();
+    setApiUrl(saved.apiUrl);
+    setTenantSlug(saved.tenantSlug);
     setLoading(false);
   }, []);
 
@@ -81,6 +87,8 @@ export default function SettingsScreen() {
     if (result.ok && result.driverInfo) {
       // mobileApiKeyをSTORAGE_KEYSにも保存
       await AsyncStorage.setItem(TRUCK_STORAGE_KEYS.MOBILE_API_KEY, mobileApiKey.trim());
+      // サーバーURLとテナントスラッグを永続保存（ログアウト後も保持）
+      await saveServerSettings(apiUrl.trim(), tenantSlug.trim());
       setDriverInfo(result.driverInfo);
       setPassword("");
       Alert.alert("ログイン成功", `${result.driverInfo.name} さん、ようこそ！`);

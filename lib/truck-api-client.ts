@@ -12,6 +12,8 @@ export const TRUCK_STORAGE_KEYS = {
   CURRENT_OPERATION_ID: "truck_current_operation_id",
   PENDING_LOCATIONS: "truck_pending_locations",
   MOBILE_API_KEY: "truck_mobile_api_key",
+  SAVED_API_URL: "truck_saved_api_url",
+  SAVED_TENANT_SLUG: "truck_saved_tenant_slug",
 } as const;
 
 // デフォルト設定
@@ -93,6 +95,27 @@ export async function saveTruckDriverInfo(info: TruckDriverInfo): Promise<void> 
 export async function clearTruckDriverInfo(): Promise<void> {
   await AsyncStorage.removeItem(TRUCK_STORAGE_KEYS.DRIVER_INFO);
   await AsyncStorage.removeItem(TRUCK_STORAGE_KEYS.CURRENT_OPERATION_ID);
+  // SAVED_API_URL / SAVED_TENANT_SLUG はログアウト後も保持する
+}
+
+/**
+ * 保存済みのサーバー設定を取得する（ログアウト後も保持）
+ */
+export async function getSavedServerSettings(): Promise<{ apiUrl: string; tenantSlug: string }> {
+  const apiUrl = await AsyncStorage.getItem(TRUCK_STORAGE_KEYS.SAVED_API_URL);
+  const tenantSlug = await AsyncStorage.getItem(TRUCK_STORAGE_KEYS.SAVED_TENANT_SLUG);
+  return {
+    apiUrl: apiUrl ?? DEFAULT_API_URL,
+    tenantSlug: tenantSlug ?? DEFAULT_TENANT_SLUG,
+  };
+}
+
+/**
+ * サーバー設定を保存する（ログアウト後も保持）
+ */
+export async function saveServerSettings(apiUrl: string, tenantSlug: string): Promise<void> {
+  await AsyncStorage.setItem(TRUCK_STORAGE_KEYS.SAVED_API_URL, apiUrl);
+  await AsyncStorage.setItem(TRUCK_STORAGE_KEYS.SAVED_TENANT_SLUG, tenantSlug);
 }
 
 /**
