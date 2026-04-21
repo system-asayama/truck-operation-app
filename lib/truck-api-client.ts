@@ -130,7 +130,7 @@ async function truckApiRequest<T>(
   body?: Record<string, unknown>
 ): Promise<{ ok: boolean; data?: T; error?: string }> {
   try {
-    const url = `${apiUrl.replace(/\/$/, "")}/api/mobile${path}`;
+    const url = `${apiUrl.replace(/\/$/, "")}/truck/api/mobile${path}`;
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       "X-Mobile-API-Key": mobileApiKey,
@@ -163,7 +163,7 @@ export async function loginTruckDriver(params: {
   password: string;
 }): Promise<{ ok: boolean; driverInfo?: TruckDriverInfo; error?: string }> {
   try {
-    const url = `${params.apiUrl.replace(/\/$/, "")}/api/mobile/auth/login`;
+    const url = `${params.apiUrl.replace(/\/$/, "")}/truck/api/mobile/auth/login`;
     const response = await fetch(url, {
       method: "POST",
       headers: {
