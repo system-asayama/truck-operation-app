@@ -75,6 +75,9 @@ const MAPPING = {
   "arrow.clockwise": "refresh",
   "xmark": "close",
   "checkmark": "check",
+  // Download / Update
+  "arrow.down.circle.fill": "download",
+  "arrow.down.circle": "download",
 } as unknown as IconMapping;
 
 /**

@@ -22,6 +22,10 @@
   - [x] ダークモード切り替え
 - [x] タブレイアウト設定（3タブ）
 - [x] TypeScriptエラー修正
+- [x] theme-provider の console.log 削除（publish 準備）
+- [x] icon-symbol に arrow.down.circle.fill マッピング追加
+- [x] design.md 作成
+- [x] todo.md 更新
 
 ## 未完了
 
