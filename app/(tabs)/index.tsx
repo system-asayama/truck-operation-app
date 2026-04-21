@@ -445,20 +445,19 @@ export default function OperationScreen() {
                   <Text style={[styles.completedSubText, { color: colors.muted }]}>お疲れ様でした</Text>
                 </View>
               )}
+              {currentStatus !== "off" && currentStatus !== "finished" && (
+                <View style={[styles.gpsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <View style={styles.gpsCardHeader}>
+                    <IconSymbol name="location.fill" size={18} color={colors.primary} />
+                    <Text style={[styles.gpsCardTitle, { color: colors.foreground }]}>GPS追跡</Text>
+                  </View>
+                  <View style={styles.gpsStatusRow}>
+                    <View style={[styles.gpsStatusDot, { backgroundColor: colors.success }]} />
+                    <Text style={[styles.gpsStatusText, { color: colors.muted }]}>30秒ごとに位置情報を自動記録中</Text>
+                  </View>
+                </View>
+              )}
             </View>
-
-            {currentStatus !== "off" && currentStatus !== "finished" && (
-              <View style={[styles.gpsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <View style={styles.gpsCardHeader}>
-                  <IconSymbol name="location.fill" size={18} color={colors.primary} />
-                  <Text style={[styles.gpsCardTitle, { color: colors.foreground }]}>GPS追跡</Text>
-                </View>
-                <View style={styles.gpsStatusRow}>
-                  <View style={[styles.gpsStatusDot, { backgroundColor: colors.success }]} />
-                  <Text style={[styles.gpsStatusText, { color: colors.muted }]}>30秒ごとに位置情報を自動記録中</Text>
-                </View>
-              </View>
-            )}
           </>
         )}
       </ScrollView>
