@@ -30,6 +30,8 @@ export interface TruckDriverInfo {
   apiUrl: string;
   tenantSlug: string;
   mobileApiKey: string;
+  /** GPS送信間隔（秒）サーバー側から取得。デフォルト30秒。 */
+  gpsIntervalSeconds: number;
 }
 
 export interface Truck {
@@ -189,6 +191,7 @@ export async function loginTruckDriver(params: {
       apiUrl: params.apiUrl,
       tenantSlug: params.tenantSlug,
       mobileApiKey: params.mobileApiKey,
+      gpsIntervalSeconds: typeof json.gps_interval_seconds === "number" ? json.gps_interval_seconds : 30,
     };
     await saveTruckDriverInfo(driverInfo);
     return { ok: true, driverInfo };

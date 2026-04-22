@@ -137,16 +137,30 @@ export default function OperationScreen() {
         Alert.alert("バックグラウンド位置情報", "バックグラウンドでの位置情報追跡が許可されていません。設定から「常に許可」に変更してください。");
       }
       await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_OPERATION_ID, String(operationId));
+      // GPS間隔をサーバー設定から取得（デフォルト30秒）
+      const gpsIntervalSec = driverInfo?.gpsIntervalSeconds ?? 30;
+      const gpsIntervalMs = gpsIntervalSec * 1000;
+      // 間隔に応じて精度を自動調整（従業員勤怠GPSと同じロジック）
+      let accuracy: Location.Accuracy;
+      if (gpsIntervalSec <= 1) {
+        accuracy = Location.Accuracy.BestForNavigation;
+      } else if (gpsIntervalSec <= 5) {
+        accuracy = Location.Accuracy.Highest;
+      } else if (gpsIntervalSec <= 30) {
+        accuracy = Location.Accuracy.High;
+      } else {
+        accuracy = Location.Accuracy.Balanced;
+      }
       const isRunning = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
       if (!isRunning) {
         await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
-          accuracy: Location.Accuracy.High,
-          timeInterval: 30000,
+          accuracy,
+          timeInterval: gpsIntervalMs,
           distanceInterval: 0,
           showsBackgroundLocationIndicator: true,
           foregroundService: {
             notificationTitle: "トラック運行追跡中",
-            notificationBody: "運行中の位置情報を記録しています",
+            notificationBody: `運行中の位置情報を${gpsIntervalSec}秒ごとに記録しています`,
             notificationColor: "#1a3a5c",
           },
         });
@@ -154,7 +168,7 @@ export default function OperationScreen() {
     } catch (err) {
       console.warn("[OperationScreen] GPS追跡開始エラー:", err);
     }
-  }, []);
+  }, [driverInfo]);
 
   const stopGpsTracking = useCallback(async () => {
     if (Platform.OS === "web" || !isBackgroundTaskAvailable) return;
@@ -470,7 +484,7 @@ export default function OperationScreen() {
                 </View>
                 <View style={styles.gpsStatusRow}>
                   <View style={[styles.gpsStatusDot, { backgroundColor: colors.success }]} />
-                  <Text style={[styles.gpsStatusText, { color: colors.muted }]}>30秒ごとに位置情報を自動記録中</Text>
+                  <Text style={[styles.gpsStatusText, { color: colors.muted }]}>{driverInfo?.gpsIntervalSeconds ?? 30}秒ごとに位置情報を自動記録中</Text>
                 </View>
                 <View style={styles.gpsCountRow}>
                   <Text style={[styles.gpsCountLabel, { color: colors.muted }]}>出勤後の送信件数：</Text>

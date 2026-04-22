@@ -593,7 +593,19 @@ def mobile_login():
     if not driver or not check_password_hash(driver.password_hash, password):
         return jsonify({"ok": False, "error": "ログインIDまたはパスワードが正しくありません"}), 401
     token = make_driver_token(driver.id)
-    return jsonify({"ok": True, "staff_token": token, "staff_id": driver.id, "staff_type": "driver", "name": driver.name})
+    # GPS間隔をapp_settingsから取得（デフォルト30秒）
+    try:
+        gps_interval_seconds = int(AppSettings.get("gps_interval_seconds", "30") or "30")
+    except (ValueError, TypeError):
+        gps_interval_seconds = 30
+    return jsonify({
+        "ok": True,
+        "staff_token": token,
+        "staff_id": driver.id,
+        "staff_type": "driver",
+        "name": driver.name,
+        "gps_interval_seconds": gps_interval_seconds,
+    })
 
 
 @app.route("/api/mobile/trucks", methods=["GET"])
