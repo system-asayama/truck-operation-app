@@ -19,6 +19,7 @@ import {
 import { useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import Constants from "expo-constants";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
@@ -373,7 +374,7 @@ export default function SettingsScreen() {
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <View style={styles.infoRow}>
               <Text style={[styles.infoLabel, { color: colors.muted }]}>バージョン</Text>
-              <Text style={[styles.infoValue, { color: colors.foreground }]}>1.0.2</Text>
+              <Text style={[styles.infoValue, { color: colors.foreground }]}>{Constants.expoConfig?.version ?? "--"}</Text>
             </View>
           </View>
         </View>
