@@ -370,38 +370,42 @@ export default function OperationScreen() {
 
               {currentStatus === "driving" && (
                 <View style={styles.buttonGrid}>
-                  <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: "#d97706" }]}
-                    onPress={() => confirmStatusUpdate("break", "休憩開始", "休憩を開始しますか？")}
-                    disabled={actionLoading}
-                  >
-                    <IconSymbol name="pause.circle.fill" size={28} color="#ffffff" />
-                    <Text style={styles.actionButtonText}>休憩開始</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: "#2563eb" }]}
-                    onPress={() => confirmStatusUpdate("loading", "荷積み開始", "荷積みを開始しますか？")}
-                    disabled={actionLoading}
-                  >
-                    <IconSymbol name="shippingbox.fill" size={28} color="#ffffff" />
-                    <Text style={styles.actionButtonText}>荷積み開始</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: "#7c3aed" }]}
-                    onPress={() => confirmStatusUpdate("unloading", "荷下ろし開始", "荷下ろしを開始しますか？")}
-                    disabled={actionLoading}
-                  >
-                    <IconSymbol name="shippingbox" size={28} color="#ffffff" />
-                    <Text style={styles.actionButtonText}>荷下ろし開始</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: "#dc2626" }]}
-                    onPress={() => confirmStatusUpdate("finished", "運行終了", "本日の運行を終了しますか？\n終了後は再開できません。")}
-                    disabled={actionLoading}
-                  >
-                    <IconSymbol name="flag.checkered" size={28} color="#ffffff" />
-                    <Text style={styles.actionButtonText}>運行終了</Text>
-                  </TouchableOpacity>
+                  <View style={styles.buttonRow}>
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: "#d97706" }]}
+                      onPress={() => confirmStatusUpdate("break", "休憩開始", "休憩を開始しますか？")}
+                      disabled={actionLoading}
+                    >
+                      <IconSymbol name="pause.circle.fill" size={28} color="#ffffff" />
+                      <Text style={styles.actionButtonText}>休憩開始</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: "#2563eb" }]}
+                      onPress={() => confirmStatusUpdate("loading", "荷積み開始", "荷積みを開始しますか？")}
+                      disabled={actionLoading}
+                    >
+                      <IconSymbol name="shippingbox.fill" size={28} color="#ffffff" />
+                      <Text style={styles.actionButtonText}>荷積み開始</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.buttonRow}>
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: "#7c3aed" }]}
+                      onPress={() => confirmStatusUpdate("unloading", "荷下ろし開始", "荷下ろしを開始しますか？")}
+                      disabled={actionLoading}
+                    >
+                      <IconSymbol name="shippingbox" size={28} color="#ffffff" />
+                      <Text style={styles.actionButtonText}>荷下ろし開始</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: "#dc2626" }]}
+                      onPress={() => confirmStatusUpdate("finished", "運行終了", "本日の運行を終了しますか？\n終了後は再開できません。")}
+                      disabled={actionLoading}
+                    >
+                      <IconSymbol name="flag.checkered" size={28} color="#ffffff" />
+                      <Text style={styles.actionButtonText}>運行終了</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
 
@@ -583,8 +587,9 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: "700" },
   primaryButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 18, borderRadius: 16, gap: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 4 },
   primaryButtonText: { color: "#ffffff", fontSize: 18, fontWeight: "700" },
-  buttonGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12, minHeight: 240 },
-  actionButton: { flex: 1, minWidth: "45%", maxWidth: "48%", alignItems: "center", justifyContent: "center", paddingVertical: 20, borderRadius: 16, gap: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 4 },
+  buttonGrid: { flexDirection: "column", gap: 12 },
+  buttonRow: { flexDirection: "row", gap: 12 },
+  actionButton: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 28, borderRadius: 16, gap: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 4 },
   actionButtonText: { color: "#ffffff", fontSize: 14, fontWeight: "700" },
   completedCard: { alignItems: "center", padding: 32, borderRadius: 16, borderWidth: 1, gap: 12 },
   completedText: { fontSize: 18, fontWeight: "700" },
