@@ -34,7 +34,7 @@ async function sendLocationToFlask(params: {
   operationId: number | null;
 }): Promise<boolean> {
   try {
-    const url = `${params.apiUrl.replace(/\/$/, "")}/api/mobile/location/record`;
+    const url = `${params.apiUrl.replace(/\/$/, "")}/truck/api/mobile/location/record`;
     const response = await fetch(url, {
       method: "POST",
       headers: {
