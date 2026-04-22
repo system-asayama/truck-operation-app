@@ -658,6 +658,68 @@ def mobile_operation_status():
     return jsonify({"ok": True})
 
 
+@app.route("/api/mobile/gps", methods=["POST"])
+def mobile_gps():
+    """GPS位置情報を記録
+    JSONボディ: { operation_id, driver_id, latitude, longitude, accuracy, recorded_at }
+    """
+    api_key = request.headers.get("X-Mobile-API-Key", "")
+    if not hmac.compare_digest(api_key, MOBILE_API_KEY):
+        return jsonify({"ok": False, "error": "APIキーが無効です"}), 401
+    data = request.get_json(silent=True) or {}
+    latitude = data.get("latitude")
+    longitude = data.get("longitude")
+    if latitude is None or longitude is None:
+        return jsonify({"ok": False, "error": "latitude と longitude は必須です"}), 400
+    operation_id = data.get("operation_id")
+    driver_id = data.get("driver_id")
+    accuracy = data.get("accuracy")
+    recorded_at_str = data.get("recorded_at")
+    if recorded_at_str:
+        try:
+            recorded_at = datetime.fromisoformat(recorded_at_str.replace("Z", "+00:00")).replace(tzinfo=None)
+        except Exception:
+            recorded_at = datetime.now()
+    else:
+        recorded_at = datetime.now()
+    # tenant_id を operation から取得
+    tenant_id = None
+    if operation_id:
+        op = Operation.query.get(operation_id)
+        if op:
+            tenant_id = op.tenant_id
+    elif driver_id:
+        drv = Driver.query.get(driver_id)
+        if drv:
+            tenant_id = drv.tenant_id
+    hub_session = get_hub_session()
+    try:
+        hub_session.execute(
+            text("""
+                INSERT INTO \"T_トラック運行位置履歴\"
+                    (operation_id, driver_id, tenant_id, latitude, longitude, accuracy, recorded_at)
+                VALUES
+                    (:operation_id, :driver_id, :tenant_id, :latitude, :longitude, :accuracy, :recorded_at)
+            """),
+            {
+                "operation_id": operation_id,
+                "driver_id": driver_id,
+                "tenant_id": tenant_id,
+                "latitude": float(latitude),
+                "longitude": float(longitude),
+                "accuracy": float(accuracy) if accuracy is not None else None,
+                "recorded_at": recorded_at,
+            }
+        )
+        hub_session.commit()
+    except Exception as e:
+        hub_session.rollback()
+        return jsonify({"ok": False, "error": str(e)}), 500
+    finally:
+        hub_session.close()
+    return jsonify({"ok": True})
+
+
 # ─── ドライバーマイページ ──────────────────────────────────
 
 def driver_login_required(f):
