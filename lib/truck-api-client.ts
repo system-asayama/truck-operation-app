@@ -17,7 +17,7 @@ export const TRUCK_STORAGE_KEYS = {
 } as const;
 
 // デフォルト設定
-export const DEFAULT_API_URL = "https://samurai-hub.com";
+export const DEFAULT_API_URL = "https://dev.samurai-hub.com";
 export const DEFAULT_TENANT_SLUG = "zeioks";
 export const DEFAULT_MOBILE_API_KEY = "truck-app-key";
 

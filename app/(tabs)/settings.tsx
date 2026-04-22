@@ -325,11 +325,11 @@ export default function SettingsScreen() {
               <View style={[styles.logoSmall, { backgroundColor: "#3ddc84" }]}>
                 <IconSymbol name="arrow.down.circle.fill" size={20} color="#ffffff" />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, marginLeft: 4 }}>
                 <Text style={[styles.cardTitle, { color: colors.foreground }]}>アプリ更新</Text>
-                <Text style={[styles.cardSubtitle, { color: colors.muted }]}>最新版のAPKをダウンロード</Text>
               </View>
             </View>
+            <Text style={[styles.cardSubtitle, { color: colors.muted, marginTop: -4 }]}>最新版のAPKをダウンロード</Text>
             <TouchableOpacity
               style={[styles.downloadButton, { backgroundColor: "#3ddc84" }]}
               onPress={() => {
@@ -373,7 +373,7 @@ export default function SettingsScreen() {
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <View style={styles.infoRow}>
               <Text style={[styles.infoLabel, { color: colors.muted }]}>バージョン</Text>
-              <Text style={[styles.infoValue, { color: colors.foreground }]}>1.0.0</Text>
+              <Text style={[styles.infoValue, { color: colors.foreground }]}>1.0.2</Text>
             </View>
           </View>
         </View>
