@@ -15,6 +15,7 @@ export const STORAGE_KEYS = {
   CURRENT_OPERATION_ID: "truck_current_operation_id",
   PENDING_LOCATIONS: "truck_pending_locations",
   MOBILE_API_KEY: "truck_mobile_api_key",
+  GPS_SENT_COUNT: "truck_gps_sent_count",
 } as const;
 
 // バックグラウンドタスクがネイティブで利用可能かどうか
@@ -125,6 +126,10 @@ if (isBackgroundTaskAvailable) {
 
             if (success) {
               console.log("[TruckBackgroundLocation] Flask APIへの送信成功");
+              // 送信件数をカウントアップ
+              const countStr = await AsyncStorage.getItem(STORAGE_KEYS.GPS_SENT_COUNT);
+              const count = countStr ? parseInt(countStr, 10) : 0;
+              await AsyncStorage.setItem(STORAGE_KEYS.GPS_SENT_COUNT, String(count + 1));
               return;
             } else {
               console.warn("[TruckBackgroundLocation] Flask API送信失敗、AsyncStorageに保存");

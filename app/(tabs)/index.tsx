@@ -75,6 +75,7 @@ export default function OperationScreen() {
   const [selectedTruck, setSelectedTruck] = useState<Truck | null>(null);
   const [loadingTrucks, setLoadingTrucks] = useState(false);
   const [loadingRoutes, setLoadingRoutes] = useState(false);
+  const [gpsSentCount, setGpsSentCount] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -109,6 +110,17 @@ export default function OperationScreen() {
       loadData();
     }, [loadData])
   );
+
+  // GPS送信件数を定期的に読み込む
+  useEffect(() => {
+    const loadGpsCount = async () => {
+      const countStr = await AsyncStorage.getItem(STORAGE_KEYS.GPS_SENT_COUNT);
+      setGpsSentCount(countStr ? parseInt(countStr, 10) : 0);
+    };
+    loadGpsCount();
+    const timer = setInterval(loadGpsCount, 10000); // 10秒ごとに更新
+    return () => clearInterval(timer);
+  }, []);
 
   const startGpsTracking = useCallback(async (operationId: number) => {
     if (Platform.OS === "web" || !isBackgroundTaskAvailable) return;
@@ -456,6 +468,10 @@ export default function OperationScreen() {
                   <View style={[styles.gpsStatusDot, { backgroundColor: colors.success }]} />
                   <Text style={[styles.gpsStatusText, { color: colors.muted }]}>30秒ごとに位置情報を自動記録中</Text>
                 </View>
+                <View style={styles.gpsCountRow}>
+                  <Text style={[styles.gpsCountLabel, { color: colors.muted }]}>出勤後の送信件数：</Text>
+                  <Text style={[styles.gpsCountValue, { color: colors.primary }]}>{gpsSentCount}件</Text>
+                </View>
               </View>
             )}
           </>
@@ -567,8 +583,8 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: "700" },
   primaryButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 18, borderRadius: 16, gap: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 4 },
   primaryButtonText: { color: "#ffffff", fontSize: 18, fontWeight: "700" },
-  buttonGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  actionButton: { flex: 1, minWidth: "45%", alignItems: "center", justifyContent: "center", paddingVertical: 20, borderRadius: 16, gap: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 4 },
+  buttonGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12, minHeight: 240 },
+  actionButton: { flex: 1, minWidth: "45%", maxWidth: "48%", alignItems: "center", justifyContent: "center", paddingVertical: 20, borderRadius: 16, gap: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 4 },
   actionButtonText: { color: "#ffffff", fontSize: 14, fontWeight: "700" },
   completedCard: { alignItems: "center", padding: 32, borderRadius: 16, borderWidth: 1, gap: 12 },
   completedText: { fontSize: 18, fontWeight: "700" },
@@ -579,6 +595,9 @@ const styles = StyleSheet.create({
   gpsStatusRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   gpsStatusDot: { width: 8, height: 8, borderRadius: 4 },
   gpsStatusText: { fontSize: 12 },
+  gpsCountRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
+  gpsCountLabel: { fontSize: 12 },
+  gpsCountValue: { fontSize: 14, fontWeight: "700" },
   loginPrompt: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 16 },
   logoContainer: { width: 100, height: 100, borderRadius: 24, alignItems: "center", justifyContent: "center", marginBottom: 8 },
   appTitle: { fontSize: 24, fontWeight: "800" },
