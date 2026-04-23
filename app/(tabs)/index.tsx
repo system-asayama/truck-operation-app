@@ -1,7 +1,7 @@
 /**
  * トラック運行管理 - メイン運行画面
  */
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   ScrollView,
   Text,
@@ -12,6 +12,8 @@ import {
   ActivityIndicator,
   Modal,
   FlatList,
+  AppState,
+  AppStateStatus,
 } from "react-native";
 import { useFocusEffect } from "expo-router";
 import * as Location from "expo-location";
@@ -111,15 +113,27 @@ export default function OperationScreen() {
     }, [loadData])
   );
 
-  // GPS送信件数を定期的に読み込む
+  // GPS送信件数を定期的に読み込む（フォアグラウンド復帰時も即時更新）
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   useEffect(() => {
     const loadGpsCount = async () => {
       const countStr = await AsyncStorage.getItem(STORAGE_KEYS.GPS_SENT_COUNT);
       setGpsSentCount(countStr ? parseInt(countStr, 10) : 0);
     };
     loadGpsCount();
-    const timer = setInterval(loadGpsCount, 10000); // 10秒ごとに更新
-    return () => clearInterval(timer);
+    // 3秒ごとに更新（バックグラウンドからの復帰を素早く反映）
+    const timer = setInterval(loadGpsCount, 3000);
+    // AppStateの変化を監視してフォアグラウンド復帰時に即時更新
+    const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
+        loadGpsCount();
+      }
+      appStateRef.current = nextState;
+    });
+    return () => {
+      clearInterval(timer);
+      subscription.remove();
+    };
   }, []);
 
   const startGpsTracking = useCallback(async (operationId: number) => {
