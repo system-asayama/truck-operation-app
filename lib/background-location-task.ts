@@ -17,10 +17,18 @@ export const STORAGE_KEYS = {
   PENDING_LOCATIONS: "truck_pending_locations",
   MOBILE_API_KEY: "truck_mobile_api_key",
   GPS_SENT_COUNT: "truck_gps_sent_count",
+  SPEED_LIMIT: "truck_speed_limit",
+  LAST_SPEEDING_ALERT: "truck_last_speeding_alert",
 } as const;
 
 // バックグラウンドタスクがネイティブで利用可能かどうか
 export const isBackgroundTaskAvailable = Platform.OS !== "web";
+
+/** m/s → km/h 変換 */
+export function msToKmh(speedMs: number | null | undefined): number | null {
+  if (speedMs == null || speedMs < 0) return null;
+  return Math.round(speedMs * 3.6 * 10) / 10;
+}
 
 /**
  * Flask APIにGPS位置情報を直接送信する
@@ -32,6 +40,7 @@ async function sendLocationToFlask(params: {
   latitude: number;
   longitude: number;
   accuracy: number | null;
+  speed: number | null;
   operationId: number | null;
   status: string | null;
 }): Promise<boolean> {
@@ -48,6 +57,7 @@ async function sendLocationToFlask(params: {
         latitude: params.latitude,
         longitude: params.longitude,
         accuracy: params.accuracy,
+        speed: params.speed,
         operation_id: params.operationId,
         status: params.status,
         is_background: true,
@@ -79,10 +89,12 @@ if (isBackgroundTaskAvailable) {
         return;
       }
       const location = data.locations[data.locations.length - 1];
+      const speedKmh = msToKmh(location.coords.speed);
       console.log("[TruckBackgroundLocation] 新しい位置情報:", {
         lat: location.coords.latitude,
         lng: location.coords.longitude,
         accuracy: location.coords.accuracy,
+        speed_kmh: speedKmh,
       });
 
       try {
@@ -95,6 +107,10 @@ if (isBackgroundTaskAvailable) {
         const operationIdStr = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_OPERATION_ID);
         const operationId = operationIdStr ? parseInt(operationIdStr, 10) : null;
         const currentStatus = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_STATUS);
+
+        // 速度制限を取得（デフォルト80km/h）
+        const speedLimitStr = await AsyncStorage.getItem(STORAGE_KEYS.SPEED_LIMIT);
+        const speedLimit = speedLimitStr ? parseInt(speedLimitStr, 10) : 80;
 
         if (driverInfoJson) {
           const driverInfo = JSON.parse(driverInfoJson) as {
@@ -117,7 +133,7 @@ if (isBackgroundTaskAvailable) {
           if (!mobileApiKey) {
             console.warn("[TruckBackgroundLocation] mobileApiKeyが取得できません");
           } else {
-            // Flask APIに直接送信
+            // Flask APIに直接送信（速度も含む）
             const success = await sendLocationToFlask({
               apiUrl: driverInfo.apiUrl,
               staffToken: driverInfo.staffToken,
@@ -125,6 +141,7 @@ if (isBackgroundTaskAvailable) {
               latitude: location.coords.latitude,
               longitude: location.coords.longitude,
               accuracy: location.coords.accuracy,
+              speed: speedKmh,
               operationId,
               status: currentStatus,
             });
@@ -135,6 +152,18 @@ if (isBackgroundTaskAvailable) {
               const countStr = await AsyncStorage.getItem(STORAGE_KEYS.GPS_SENT_COUNT);
               const count = countStr ? parseInt(countStr, 10) : 0;
               await AsyncStorage.setItem(STORAGE_KEYS.GPS_SENT_COUNT, String(count + 1));
+
+              // 速度超過チェック（バックグラウンドでは通知のみ）
+              if (speedKmh !== null && speedKmh > speedLimit) {
+                // 直近60秒以内に既にアラートを出していれば抑制
+                const lastAlertStr = await AsyncStorage.getItem(STORAGE_KEYS.LAST_SPEEDING_ALERT);
+                const now = Date.now();
+                const lastAlert = lastAlertStr ? parseInt(lastAlertStr, 10) : 0;
+                if (now - lastAlert > 60000) {
+                  await AsyncStorage.setItem(STORAGE_KEYS.LAST_SPEEDING_ALERT, String(now));
+                  console.warn(`[TruckBackgroundLocation] 速度超過: ${speedKmh}km/h (制限: ${speedLimit}km/h)`);
+                }
+              }
               return;
             } else {
               console.warn("[TruckBackgroundLocation] Flask API送信失敗、AsyncStorageに保存");
@@ -150,6 +179,7 @@ if (isBackgroundTaskAvailable) {
           latitude: number;
           longitude: number;
           accuracy: number | null;
+          speed: number | null;
           recordedAt: string;
           isBackground: boolean;
           operationId: number | null;
@@ -160,6 +190,7 @@ if (isBackgroundTaskAvailable) {
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
           accuracy: location.coords.accuracy,
+          speed: speedKmh,
           recordedAt: new Date(location.timestamp).toISOString(),
           isBackground: true,
           operationId,

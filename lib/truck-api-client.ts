@@ -337,6 +337,7 @@ export async function recordTruckLocation(
     latitude: number;
     longitude: number;
     accuracy?: number;
+    speed?: number | null;
     operationId?: number;
     isBackground?: boolean;
     recordedAt?: string;
@@ -352,6 +353,7 @@ export async function recordTruckLocation(
       latitude: params.latitude,
       longitude: params.longitude,
       accuracy: params.accuracy,
+      speed: params.speed ?? null,
       operation_id: params.operationId,
       is_background: params.isBackground ?? false,
       recorded_at: params.recordedAt ?? null,
