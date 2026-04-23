@@ -100,9 +100,12 @@ export default function OperationScreen() {
         TRUCK_STORAGE_KEYS.CURRENT_OPERATION_ID,
         String(result.operation.id)
       );
+      // バックグラウンドタスクがステータスを参照できるようにAsyncStorageに保存
+      await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_STATUS, result.operation.status);
     } else {
       setOperation(null);
       setCurrentStatus("off");
+      await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_STATUS, "off");
     }
     setLoading(false);
   }, []);
@@ -275,6 +278,8 @@ export default function OperationScreen() {
     if (result.ok) {
       setCurrentStatus(newStatus);
       setOperation(prev => prev ? { ...prev, status: newStatus } : null);
+      // バックグラウンドタスクがステータスを参照できるようにAsyncStorageに保存
+      await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_STATUS, newStatus);
       if (newStatus === "finished") {
         await stopGpsTracking();
         if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

@@ -673,7 +673,7 @@ def mobile_operation_status():
 @app.route("/api/mobile/gps", methods=["POST"])
 def mobile_gps():
     """GPS位置情報を記録
-    JSONボディ: { operation_id, driver_id, latitude, longitude, accuracy, recorded_at }
+    JSONボディ: { operation_id, driver_id, latitude, longitude, accuracy, recorded_at, status }
     """
     api_key = request.headers.get("X-Mobile-API-Key", "")
     if not hmac.compare_digest(api_key, MOBILE_API_KEY):
@@ -686,6 +686,7 @@ def mobile_gps():
     operation_id = data.get("operation_id")
     driver_id = data.get("driver_id")
     accuracy = data.get("accuracy")
+    status = data.get("status")  # 運行ステータス（driving/break/loading/unloading等）
     recorded_at_str = data.get("recorded_at")
     if recorded_at_str:
         try:
@@ -709,9 +710,9 @@ def mobile_gps():
         hub_session.execute(
             text("""
                 INSERT INTO \"T_トラック運行位置履歴\"
-                    (operation_id, driver_id, tenant_id, latitude, longitude, accuracy, recorded_at)
+                    (operation_id, driver_id, tenant_id, latitude, longitude, accuracy, status, recorded_at)
                 VALUES
-                    (:operation_id, :driver_id, :tenant_id, :latitude, :longitude, :accuracy, :recorded_at)
+                    (:operation_id, :driver_id, :tenant_id, :latitude, :longitude, :accuracy, :status, :recorded_at)
             """),
             {
                 "operation_id": operation_id,
@@ -720,6 +721,7 @@ def mobile_gps():
                 "latitude": float(latitude),
                 "longitude": float(longitude),
                 "accuracy": float(accuracy) if accuracy is not None else None,
+                "status": status,
                 "recorded_at": recorded_at,
             }
         )
@@ -884,14 +886,27 @@ def gps_map():
             ids_str = ','.join(str(sid) for sid in staff_ids)
             dt_start = datetime.combine(target_date, datetime.min.time())
             dt_end = datetime.combine(target_date + timedelta(days=1), datetime.min.time())
-            locs = hub.execute(text(f"""
-                SELECT staff_id, staff_type, latitude, longitude, accuracy, recorded_at
-                FROM \"T_勤怠位置履歴\"
-                WHERE staff_id IN ({ids_str})
-                  AND recorded_at >= :dt_start
-                  AND recorded_at < :dt_end
-                ORDER BY staff_id ASC, recorded_at ASC
-            """), {'dt_start': dt_start, 'dt_end': dt_end}).fetchall()
+            # statusカラムを含めて取得を試みる（カラムがない場合はフォールバック）
+            try:
+                locs = hub.execute(text(f"""
+                    SELECT staff_id, staff_type, latitude, longitude, accuracy, recorded_at, status
+                    FROM \"T_勤怠位置履歴\"
+                    WHERE staff_id IN ({ids_str})
+                      AND recorded_at >= :dt_start
+                      AND recorded_at < :dt_end
+                    ORDER BY staff_id ASC, recorded_at ASC
+                """), {'dt_start': dt_start, 'dt_end': dt_end}).fetchall()
+                has_status_col = True
+            except Exception:
+                locs = hub.execute(text(f"""
+                    SELECT staff_id, staff_type, latitude, longitude, accuracy, recorded_at
+                    FROM \"T_勤怠位置履歴\"
+                    WHERE staff_id IN ({ids_str})
+                      AND recorded_at >= :dt_start
+                      AND recorded_at < :dt_end
+                    ORDER BY staff_id ASC, recorded_at ASC
+                """), {'dt_start': dt_start, 'dt_end': dt_end}).fetchall()
+                has_status_col = False
             for loc in locs:
                 key = loc[0]  # staff_id
                 if key not in staff_tracks:
@@ -899,7 +914,8 @@ def gps_map():
                 staff_tracks[key].append({
                     'lat': float(loc[2]),
                     'lng': float(loc[3]),
-                    'time': loc[5].strftime('%H:%M:%S') if loc[5] else ''
+                    'time': loc[5].strftime('%H:%M:%S') if loc[5] else '',
+                    'status': loc[6] if has_status_col and len(loc) > 6 else None
                 })
 
         # tracks_dataを構築
@@ -995,14 +1011,27 @@ def gps_map_realtime_data():
             ids_str = ','.join(str(sid) for sid in staff_ids)
             dt_start = datetime.combine(target_date, datetime.min.time())
             dt_end = datetime.combine(target_date + timedelta(days=1), datetime.min.time())
-            locs = hub.execute(text(f"""
-                SELECT staff_id, latitude, longitude, recorded_at
-                FROM \"T_勤怠位置履歴\"
-                WHERE staff_id IN ({ids_str})
-                  AND recorded_at >= :dt_start
-                  AND recorded_at < :dt_end
-                ORDER BY staff_id ASC, recorded_at ASC
-            """), {'dt_start': dt_start, 'dt_end': dt_end}).fetchall()
+            # statusカラムを含めて取得を試みる（カラムがない場合はフォールバック）
+            try:
+                locs = hub.execute(text(f"""
+                    SELECT staff_id, latitude, longitude, recorded_at, status
+                    FROM \"T_勤怠位置履歴\"
+                    WHERE staff_id IN ({ids_str})
+                      AND recorded_at >= :dt_start
+                      AND recorded_at < :dt_end
+                    ORDER BY staff_id ASC, recorded_at ASC
+                """), {'dt_start': dt_start, 'dt_end': dt_end}).fetchall()
+                rt_has_status = True
+            except Exception:
+                locs = hub.execute(text(f"""
+                    SELECT staff_id, latitude, longitude, recorded_at
+                    FROM \"T_勤怠位置履歴\"
+                    WHERE staff_id IN ({ids_str})
+                      AND recorded_at >= :dt_start
+                      AND recorded_at < :dt_end
+                    ORDER BY staff_id ASC, recorded_at ASC
+                """), {'dt_start': dt_start, 'dt_end': dt_end}).fetchall()
+                rt_has_status = False
             for loc in locs:
                 key = loc[0]
                 if key not in staff_tracks:
@@ -1010,7 +1039,8 @@ def gps_map_realtime_data():
                 staff_tracks[key].append({
                     'lat': float(loc[1]),
                     'lng': float(loc[2]),
-                    'time': loc[3].strftime('%H:%M:%S') if loc[3] else ''
+                    'time': loc[3].strftime('%H:%M:%S') if loc[3] else '',
+                    'status': loc[4] if rt_has_status and len(loc) > 4 else None
                 })
 
         tracks = []

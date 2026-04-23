@@ -13,6 +13,7 @@ export const BACKGROUND_LOCATION_TASK = "truck-background-location";
 export const STORAGE_KEYS = {
   DRIVER_INFO: "truck_driver_info",
   CURRENT_OPERATION_ID: "truck_current_operation_id",
+  CURRENT_STATUS: "truck_current_status",
   PENDING_LOCATIONS: "truck_pending_locations",
   MOBILE_API_KEY: "truck_mobile_api_key",
   GPS_SENT_COUNT: "truck_gps_sent_count",
@@ -32,6 +33,7 @@ async function sendLocationToFlask(params: {
   longitude: number;
   accuracy: number | null;
   operationId: number | null;
+  status: string | null;
 }): Promise<boolean> {
   try {
     const url = `${params.apiUrl.replace(/\/$/, "")}/truck/api/mobile/location/record`;
@@ -47,6 +49,7 @@ async function sendLocationToFlask(params: {
         longitude: params.longitude,
         accuracy: params.accuracy,
         operation_id: params.operationId,
+        status: params.status,
         is_background: true,
       }),
     });
@@ -91,6 +94,7 @@ if (isBackgroundTaskAvailable) {
         const driverInfoJson = await AsyncStorage.getItem(STORAGE_KEYS.DRIVER_INFO);
         const operationIdStr = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_OPERATION_ID);
         const operationId = operationIdStr ? parseInt(operationIdStr, 10) : null;
+        const currentStatus = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_STATUS);
 
         if (driverInfoJson) {
           const driverInfo = JSON.parse(driverInfoJson) as {
@@ -122,6 +126,7 @@ if (isBackgroundTaskAvailable) {
               longitude: location.coords.longitude,
               accuracy: location.coords.accuracy,
               operationId,
+              status: currentStatus,
             });
 
             if (success) {
@@ -148,6 +153,7 @@ if (isBackgroundTaskAvailable) {
           recordedAt: string;
           isBackground: boolean;
           operationId: number | null;
+          status: string | null;
         }> = pending ? JSON.parse(pending) : [];
 
         pendingLocations.push({
@@ -157,6 +163,7 @@ if (isBackgroundTaskAvailable) {
           recordedAt: new Date(location.timestamp).toISOString(),
           isBackground: true,
           operationId,
+          status: currentStatus,
         });
 
         // 最大200件まで保持
