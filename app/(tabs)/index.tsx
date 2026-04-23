@@ -64,9 +64,6 @@ const STATUS_COLORS: Record<string, string> = {
   finished: "#64748b",
 };
 
-/** 速度超過のデフォルト制限 (km/h) */
-const DEFAULT_SPEED_LIMIT = 80;
-
 export default function OperationScreen() {
   const colors = useColors();
   const [driverInfo, setDriverInfo] = useState<TruckDriverInfo | null>(null);
@@ -85,21 +82,11 @@ export default function OperationScreen() {
   const [gpsSentCount, setGpsSentCount] = useState(0);
   // 速度関連
   const [currentSpeedKmh, setCurrentSpeedKmh] = useState<number | null>(null);
-  const [isSpeeding, setIsSpeeding] = useState(false);
-  const [speedLimit, setSpeedLimit] = useState(DEFAULT_SPEED_LIMIT);
-  const lastSpeedingAlertRef = useRef<number>(0);
   const locationSubscriptionRef = useRef<Location.LocationSubscription | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
-  }, []);
-
-  // 速度制限をAsyncStorageから読み込む
-  useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEYS.SPEED_LIMIT).then((val) => {
-      if (val) setSpeedLimit(parseInt(val, 10));
-    });
   }, []);
 
   const loadData = useCallback(async () => {
@@ -175,13 +162,12 @@ export default function OperationScreen() {
     };
   }, []);
 
-  /** フォアグラウンドでの速度監視（1秒ごとに現在速度を取得） */
+  /** フォアグラウンドでの速度監視（3秒ごとに現在速度を取得） */
   const startSpeedMonitoring = useCallback(async () => {
     if (Platform.OS === "web") return;
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") return;
-      // 既存のサブスクリプションを解除
       if (locationSubscriptionRef.current) {
         locationSubscriptionRef.current.remove();
       }
@@ -194,32 +180,13 @@ export default function OperationScreen() {
         (loc) => {
           const kmh = msToKmh(loc.coords.speed);
           setCurrentSpeedKmh(kmh);
-          const limit = speedLimit;
-          if (kmh !== null && kmh > limit) {
-            setIsSpeeding(true);
-            // 60秒に1回だけアラート
-            const now = Date.now();
-            if (now - lastSpeedingAlertRef.current > 60000) {
-              lastSpeedingAlertRef.current = now;
-              if (Platform.OS !== "web") {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-              }
-              Alert.alert(
-                "⚠️ 速度超過",
-                `現在の速度: ${kmh}km/h\n制限速度: ${limit}km/h\n\n速度を落としてください。`,
-                [{ text: "確認", style: "default" }]
-              );
-            }
-          } else {
-            setIsSpeeding(false);
-          }
         }
       );
       locationSubscriptionRef.current = sub;
     } catch (err) {
       console.warn("[OperationScreen] 速度監視開始エラー:", err);
     }
-  }, [speedLimit]);
+  }, []);
 
   const stopSpeedMonitoring = useCallback(() => {
     if (locationSubscriptionRef.current) {
@@ -227,7 +194,6 @@ export default function OperationScreen() {
       locationSubscriptionRef.current = null;
     }
     setCurrentSpeedKmh(null);
-    setIsSpeeding(false);
   }, []);
 
   const startGpsTracking = useCallback(async (operationId: number) => {
@@ -421,17 +387,16 @@ export default function OperationScreen() {
 
   return (
     <ScreenContainer containerClassName="bg-background">
-      <View style={[styles.header, { backgroundColor: isSpeeding ? "#dc2626" : colors.primary }]}>
+      <View style={[styles.header, { backgroundColor: colors.primary }]}>
         <View>
           <Text style={styles.headerDate}>{formatDate()}</Text>
           <Text style={styles.headerTime}>{formatCurrentTime()}</Text>
         </View>
         <View style={styles.headerRight}>
           {currentSpeedKmh !== null && currentStatus !== "off" && currentStatus !== "finished" && (
-            <View style={[styles.speedBadge, { backgroundColor: isSpeeding ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.15)" }]}>
+            <View style={[styles.speedBadge, { backgroundColor: "rgba(255,255,255,0.15)" }]}>
               <Text style={styles.speedValue}>{currentSpeedKmh}</Text>
               <Text style={styles.speedUnit}>km/h</Text>
-              {isSpeeding && <Text style={styles.speedingLabel}>超過!</Text>}
             </View>
           )}
           <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
@@ -449,19 +414,6 @@ export default function OperationScreen() {
           </View>
         ) : (
           <>
-            {/* 速度超過警告バナー */}
-            {isSpeeding && currentSpeedKmh !== null && (
-              <View style={styles.speedingBanner}>
-                <Text style={styles.speedingBannerIcon}>⚠️</Text>
-                <View>
-                  <Text style={styles.speedingBannerTitle}>速度超過</Text>
-                  <Text style={styles.speedingBannerText}>
-                    {currentSpeedKmh}km/h（制限: {speedLimit}km/h）
-                  </Text>
-                </View>
-              </View>
-            )}
-
             {operation && currentStatus !== "off" ? (
               <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <View style={styles.cardHeader}>
@@ -625,10 +577,6 @@ export default function OperationScreen() {
                   <Text style={[styles.gpsCountLabel, { color: colors.muted }]}>出勤後の送信件数：</Text>
                   <Text style={[styles.gpsCountValue, { color: colors.primary }]}>{gpsSentCount}件</Text>
                 </View>
-                <View style={[styles.speedLimitRow, { borderTopColor: colors.border }]}>
-                  <Text style={[styles.speedLimitLabel, { color: colors.muted }]}>速度制限設定：</Text>
-                  <Text style={[styles.speedLimitValue, { color: colors.foreground }]}>{speedLimit}km/h</Text>
-                </View>
               </View>
             )}
           </>
@@ -727,14 +675,9 @@ const styles = StyleSheet.create({
   speedBadge: { flexDirection: "row", alignItems: "baseline", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, gap: 2 },
   speedValue: { color: "#ffffff", fontSize: 22, fontWeight: "800" },
   speedUnit: { color: "rgba(255,255,255,0.85)", fontSize: 11, fontWeight: "600" },
-  speedingLabel: { color: "#ffffff", fontSize: 11, fontWeight: "700", backgroundColor: "rgba(0,0,0,0.2)", paddingHorizontal: 4, borderRadius: 4, marginLeft: 2 },
   statusBadge: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, gap: 6 },
   statusDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.8)" },
   statusBadgeText: { color: "#ffffff", fontSize: 13, fontWeight: "600" },
-  speedingBanner: { flexDirection: "row", alignItems: "center", backgroundColor: "#dc2626", borderRadius: 12, padding: 14, gap: 12 },
-  speedingBannerIcon: { fontSize: 24 },
-  speedingBannerTitle: { color: "#ffffff", fontSize: 16, fontWeight: "800" },
-  speedingBannerText: { color: "rgba(255,255,255,0.9)", fontSize: 13, marginTop: 2 },
   content: { padding: 16, gap: 16, paddingBottom: 32 },
   loadingContainer: { alignItems: "center", paddingTop: 60, gap: 12 },
   loadingText: { fontSize: 15 },
@@ -765,9 +708,6 @@ const styles = StyleSheet.create({
   gpsCountRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
   gpsCountLabel: { fontSize: 12 },
   gpsCountValue: { fontSize: 14, fontWeight: "700" },
-  speedLimitRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4, paddingTop: 8, borderTopWidth: 1 },
-  speedLimitLabel: { fontSize: 12 },
-  speedLimitValue: { fontSize: 13, fontWeight: "700" },
   loginPrompt: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 16 },
   logoContainer: { width: 100, height: 100, borderRadius: 24, alignItems: "center", justifyContent: "center", marginBottom: 8 },
   appTitle: { fontSize: 24, fontWeight: "800" },
