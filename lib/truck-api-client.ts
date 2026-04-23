@@ -392,3 +392,21 @@ export async function getOperationHistory(
   }));
   return { ok: true, operations };
 }
+
+/**
+ * サーバーから運行開始時間以降のGPS送信件数を取得する
+ */
+export async function getGpsSentCount(
+  info: TruckDriverInfo,
+  operationId: number
+): Promise<{ ok: boolean; count?: number; error?: string }> {
+  const result = await truckApiRequest<{ count: number }>(
+    info.apiUrl,
+    info.staffToken,
+    info.mobileApiKey,
+    `/location/count?operation_id=${operationId}`,
+    "GET"
+  );
+  if (!result.ok) return { ok: false, error: result.error };
+  return { ok: true, count: result.data?.count ?? 0 };
+}

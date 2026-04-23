@@ -31,6 +31,7 @@ import {
   getTodayOperation,
   startOperation,
   updateOperationStatus,
+  getGpsSentCount,
   type TruckDriverInfo,
   type Truck,
   type Route,
@@ -113,16 +114,34 @@ export default function OperationScreen() {
     }, [loadData])
   );
 
-  // GPS送信件数を定期的に読み込む（フォアグラウンド復帰時も即時更新）
+  // GPS送信件数をサーバーから取得（運行開始時間と整合性あり）
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const currentOperationRef = useRef<TruckOperation | null>(null);
+
+  // currentOperationRefを常に最新の値に保つ
+  useEffect(() => {
+    currentOperationRef.current = currentOperation;
+  }, [currentOperation]);
+
   useEffect(() => {
     const loadGpsCount = async () => {
-      const countStr = await AsyncStorage.getItem(STORAGE_KEYS.GPS_SENT_COUNT);
-      setGpsSentCount(countStr ? parseInt(countStr, 10) : 0);
+      const op = currentOperationRef.current;
+      const info = await getTruckDriverInfo();
+      if (op && info && op.status !== 'off' && op.status !== 'finished') {
+        // 運行中はサーバーから取得（運行開始時間以降の件数）
+        const result = await getGpsSentCount(info, op.id);
+        if (result.ok && result.count !== undefined) {
+          setGpsSentCount(result.count);
+        }
+      } else {
+        // 未運行時はAsyncStorageのローカルカウントを使用
+        const countStr = await AsyncStorage.getItem(STORAGE_KEYS.GPS_SENT_COUNT);
+        setGpsSentCount(countStr ? parseInt(countStr, 10) : 0);
+      }
     };
     loadGpsCount();
-    // 3秒ごとに更新（バックグラウンドからの復帰を素早く反映）
-    const timer = setInterval(loadGpsCount, 3000);
+    // 5秒ごとに更新
+    const timer = setInterval(loadGpsCount, 5000);
     // AppStateの変化を監視してフォアグラウンド復帰時に即時更新
     const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
       if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
