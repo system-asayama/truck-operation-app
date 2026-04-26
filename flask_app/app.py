@@ -66,6 +66,8 @@ class Truck(db.Model):
     note = db.Column(db.Text)                                       # 備考
     active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    tenant_id = db.Column(db.Integer, nullable=True)
+    store_id = db.Column(db.Integer, nullable=True)
 
     def to_dict(self):
         return {
@@ -107,6 +109,8 @@ class Driver(db.Model):
     login_id = db.Column(db.String(100), nullable=False, unique=True)  # ログインID
     password_hash = db.Column(db.String(256), nullable=False)
     name = db.Column(db.String(100), nullable=False)    # 氏名
+    tenant_id = db.Column(db.Integer, nullable=True)
+    store_id = db.Column(db.Integer, nullable=True)
     phone = db.Column(db.String(20))                    # 電話番号
     license_number = db.Column(db.String(50))           # 免許番号
     note = db.Column(db.Text)                           # 備考
@@ -136,6 +140,8 @@ class Operation(db.Model):
     end_time = db.Column(db.DateTime)
     operation_date = db.Column(db.Date, default=date.today)
     note = db.Column(db.Text)
+    tenant_id = db.Column(db.Integer, nullable=True)
+    store_id = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     driver = db.relationship("Driver", backref="operations")
@@ -276,6 +282,10 @@ app.jinja_env.globals.update(
 @app.route("/")
 @login_required
 def index():
+    store_id = request.args.get("store_id", type=int)
+    if store_id:
+        session["store_id"] = store_id
+        return redirect(url_for("store_dashboard", store_id=store_id))
     return redirect(url_for("dashboard"))
 
 
@@ -309,9 +319,21 @@ def logout():
 @login_required
 def dashboard():
     today = date.today()
-    operations = Operation.query.filter_by(operation_date=today).all()
-    trucks = Truck.query.filter_by(active=True).all()
-    drivers = Driver.query.filter_by(active=True).all()
+    store_id = session.get("store_id") or request.args.get("store_id", type=int)
+    if store_id:
+        operations = Operation.query.filter_by(operation_date=today, store_id=store_id).all()
+        trucks = Truck.query.filter_by(active=True, store_id=store_id).all()
+        drivers = Driver.query.filter_by(active=True, store_id=store_id).all()
+    else:
+        tenant_id = session.get("tenant_id")
+        if tenant_id:
+            operations = Operation.query.filter_by(operation_date=today, tenant_id=tenant_id).all()
+            trucks = Truck.query.filter_by(active=True, tenant_id=tenant_id).all()
+            drivers = Driver.query.filter_by(active=True, tenant_id=tenant_id).all()
+        else:
+            operations = Operation.query.filter_by(operation_date=today).all()
+            trucks = Truck.query.filter_by(active=True).all()
+            drivers = Driver.query.filter_by(active=True).all()
 
     status_counts = {}
     for op in operations:
@@ -319,6 +341,23 @@ def dashboard():
         status_counts[s] = status_counts.get(s, 0) + 1
 
     today_str = today.strftime("%Y年%m月%d日")
+    # テナント名・店舗名を取得
+    store_name = None
+    tenant_name = None
+    try:
+        if store_id:
+            hub_sess = get_hub_session()
+            if hub_sess:
+                from sqlalchemy import text
+                row = hub_sess.execute(
+                    text('SELECT s."名称", t."名称" FROM "T_店舗" s JOIN "T_テナント" t ON s.tenant_id = t.id WHERE s.id = :sid'),
+                    {"sid": store_id}
+                ).fetchone()
+                if row:
+                    store_name, tenant_name = row[0], row[1]
+                hub_sess.close()
+    except Exception as e:
+        pass
     return render_template(
         "admin/dashboard.html",
         operations=operations,
@@ -326,12 +365,54 @@ def dashboard():
         drivers=drivers,
         status_counts=status_counts,
         today_str=today_str,
+        store_name=store_name,
+        tenant_name=tenant_name,
         error=None,
     )
 
 
-# ─── 運行履歴 ────────────────────────────────────────────
+# ─── 店舗別ダッシュボード ───────────────────────────────────
+@app.route("/store/<int:store_id>/")
+@login_required
+def store_dashboard(store_id):
+    session["store_id"] = store_id
+    today = date.today()
+    operations = Operation.query.filter_by(operation_date=today, store_id=store_id).all()
+    trucks = Truck.query.filter_by(active=True, store_id=store_id).all()
+    drivers = Driver.query.filter_by(active=True, store_id=store_id).all()
+    status_counts = {}
+    for op in operations:
+        s = op.status or "off"
+        status_counts[s] = status_counts.get(s, 0) + 1
+    today_str = today.strftime("%Y年%m月%d日")
+    store_name = None
+    tenant_name = None
+    try:
+        hub_sess = get_hub_session()
+        if hub_sess:
+            from sqlalchemy import text as sa_text
+            row = hub_sess.execute(
+                sa_text('SELECT s."名称", t."名称" FROM "T_店舗" s JOIN "T_テナント" t ON s.tenant_id = t.id WHERE s.id = :sid'),
+                {"sid": store_id}
+            ).fetchone()
+            if row:
+                store_name, tenant_name = row[0], row[1]
+            hub_sess.close()
+    except Exception:
+        pass
+    return render_template(
+        "admin/dashboard.html",
+        operations=operations,
+        trucks=trucks,
+        drivers=drivers,
+        status_counts=status_counts,
+        today_str=today_str,
+        store_name=store_name,
+        tenant_name=tenant_name,
+        error=None,
+    )
 
+# ─── 運行履歴 ────────────────────────────────────────────
 @app.route("/history")
 @login_required
 def history():
@@ -593,19 +674,7 @@ def mobile_login():
     if not driver or not check_password_hash(driver.password_hash, password):
         return jsonify({"ok": False, "error": "ログインIDまたはパスワードが正しくありません"}), 401
     token = make_driver_token(driver.id)
-    # GPS間隔をapp_settingsから取得（デフォルト30秒）
-    try:
-        gps_interval_seconds = int(AppSettings.get("gps_interval_seconds", "30") or "30")
-    except (ValueError, TypeError):
-        gps_interval_seconds = 30
-    return jsonify({
-        "ok": True,
-        "staff_token": token,
-        "staff_id": driver.id,
-        "staff_type": "driver",
-        "name": driver.name,
-        "gps_interval_seconds": gps_interval_seconds,
-    })
+    return jsonify({"ok": True, "staff_token": token, "staff_id": driver.id, "staff_type": "driver", "name": driver.name})
 
 
 @app.route("/api/mobile/trucks", methods=["GET"])
@@ -673,7 +742,7 @@ def mobile_operation_status():
 @app.route("/api/mobile/gps", methods=["POST"])
 def mobile_gps():
     """GPS位置情報を記録
-    JSONボディ: { operation_id, driver_id, latitude, longitude, accuracy, recorded_at, status }
+    JSONボディ: { operation_id, driver_id, latitude, longitude, accuracy, recorded_at }
     """
     api_key = request.headers.get("X-Mobile-API-Key", "")
     if not hmac.compare_digest(api_key, MOBILE_API_KEY):
@@ -686,7 +755,6 @@ def mobile_gps():
     operation_id = data.get("operation_id")
     driver_id = data.get("driver_id")
     accuracy = data.get("accuracy")
-    status = data.get("status")  # 運行ステータス（driving/break/loading/unloading等）
     recorded_at_str = data.get("recorded_at")
     if recorded_at_str:
         try:
@@ -710,9 +778,9 @@ def mobile_gps():
         hub_session.execute(
             text("""
                 INSERT INTO \"T_トラック運行位置履歴\"
-                    (operation_id, driver_id, tenant_id, latitude, longitude, accuracy, status, recorded_at)
+                    (operation_id, driver_id, tenant_id, latitude, longitude, accuracy, recorded_at)
                 VALUES
-                    (:operation_id, :driver_id, :tenant_id, :latitude, :longitude, :accuracy, :status, :recorded_at)
+                    (:operation_id, :driver_id, :tenant_id, :latitude, :longitude, :accuracy, :recorded_at)
             """),
             {
                 "operation_id": operation_id,
@@ -721,7 +789,6 @@ def mobile_gps():
                 "latitude": float(latitude),
                 "longitude": float(longitude),
                 "accuracy": float(accuracy) if accuracy is not None else None,
-                "status": status,
                 "recorded_at": recorded_at,
             }
         )
@@ -886,27 +953,14 @@ def gps_map():
             ids_str = ','.join(str(sid) for sid in staff_ids)
             dt_start = datetime.combine(target_date, datetime.min.time())
             dt_end = datetime.combine(target_date + timedelta(days=1), datetime.min.time())
-            # statusカラムを含めて取得を試みる（カラムがない場合はフォールバック）
-            try:
-                locs = hub.execute(text(f"""
-                    SELECT staff_id, staff_type, latitude, longitude, accuracy, recorded_at, status
-                    FROM \"T_勤怠位置履歴\"
-                    WHERE staff_id IN ({ids_str})
-                      AND recorded_at >= :dt_start
-                      AND recorded_at < :dt_end
-                    ORDER BY staff_id ASC, recorded_at ASC
-                """), {'dt_start': dt_start, 'dt_end': dt_end}).fetchall()
-                has_status_col = True
-            except Exception:
-                locs = hub.execute(text(f"""
-                    SELECT staff_id, staff_type, latitude, longitude, accuracy, recorded_at
-                    FROM \"T_勤怠位置履歴\"
-                    WHERE staff_id IN ({ids_str})
-                      AND recorded_at >= :dt_start
-                      AND recorded_at < :dt_end
-                    ORDER BY staff_id ASC, recorded_at ASC
-                """), {'dt_start': dt_start, 'dt_end': dt_end}).fetchall()
-                has_status_col = False
+            locs = hub.execute(text(f"""
+                SELECT staff_id, staff_type, latitude, longitude, accuracy, recorded_at
+                FROM \"T_勤怠位置履歴\"
+                WHERE staff_id IN ({ids_str})
+                  AND recorded_at >= :dt_start
+                  AND recorded_at < :dt_end
+                ORDER BY staff_id ASC, recorded_at ASC
+            """), {'dt_start': dt_start, 'dt_end': dt_end}).fetchall()
             for loc in locs:
                 key = loc[0]  # staff_id
                 if key not in staff_tracks:
@@ -914,8 +968,7 @@ def gps_map():
                 staff_tracks[key].append({
                     'lat': float(loc[2]),
                     'lng': float(loc[3]),
-                    'time': loc[5].strftime('%H:%M:%S') if loc[5] else '',
-                    'status': loc[6] if has_status_col and len(loc) > 6 else None
+                    'time': loc[5].strftime('%H:%M:%S') if loc[5] else ''
                 })
 
         # tracks_dataを構築
@@ -1011,27 +1064,14 @@ def gps_map_realtime_data():
             ids_str = ','.join(str(sid) for sid in staff_ids)
             dt_start = datetime.combine(target_date, datetime.min.time())
             dt_end = datetime.combine(target_date + timedelta(days=1), datetime.min.time())
-            # statusカラムを含めて取得を試みる（カラムがない場合はフォールバック）
-            try:
-                locs = hub.execute(text(f"""
-                    SELECT staff_id, latitude, longitude, recorded_at, status
-                    FROM \"T_勤怠位置履歴\"
-                    WHERE staff_id IN ({ids_str})
-                      AND recorded_at >= :dt_start
-                      AND recorded_at < :dt_end
-                    ORDER BY staff_id ASC, recorded_at ASC
-                """), {'dt_start': dt_start, 'dt_end': dt_end}).fetchall()
-                rt_has_status = True
-            except Exception:
-                locs = hub.execute(text(f"""
-                    SELECT staff_id, latitude, longitude, recorded_at
-                    FROM \"T_勤怠位置履歴\"
-                    WHERE staff_id IN ({ids_str})
-                      AND recorded_at >= :dt_start
-                      AND recorded_at < :dt_end
-                    ORDER BY staff_id ASC, recorded_at ASC
-                """), {'dt_start': dt_start, 'dt_end': dt_end}).fetchall()
-                rt_has_status = False
+            locs = hub.execute(text(f"""
+                SELECT staff_id, latitude, longitude, recorded_at
+                FROM \"T_勤怠位置履歴\"
+                WHERE staff_id IN ({ids_str})
+                  AND recorded_at >= :dt_start
+                  AND recorded_at < :dt_end
+                ORDER BY staff_id ASC, recorded_at ASC
+            """), {'dt_start': dt_start, 'dt_end': dt_end}).fetchall()
             for loc in locs:
                 key = loc[0]
                 if key not in staff_tracks:
@@ -1039,8 +1079,7 @@ def gps_map_realtime_data():
                 staff_tracks[key].append({
                     'lat': float(loc[1]),
                     'lng': float(loc[2]),
-                    'time': loc[3].strftime('%H:%M:%S') if loc[3] else '',
-                    'status': loc[4] if rt_has_status and len(loc) > 4 else None
+                    'time': loc[3].strftime('%H:%M:%S') if loc[3] else ''
                 })
 
         tracks = []
@@ -1114,3 +1153,304 @@ with app.app_context():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
+
+# ─── GPSデバイス管理（専用デバイスからの位置情報受信）────────────
+
+import secrets as _secrets
+
+@app.route("/api/gps_device/location", methods=["POST"])
+def gps_device_location():
+    """専用GPSデバイス（Teltonika/Queclink等）からの位置情報受信API
+    
+    認証: Authorizationヘッダー または クエリパラメータ token
+    JSONボディ: { latitude, longitude, accuracy?, speed?, altitude?, recorded_at? }
+    または Teltonika形式: { lat, lng, ... }
+    """
+    # トークン認証
+    token = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
+    if not token:
+        token = request.args.get("token", "").strip()
+    if not token:
+        return jsonify({"error": "認証トークンが必要です"}), 401
+
+    hub = get_hub_session()
+    if not hub:
+        return jsonify({"error": "DB接続エラー"}), 500
+    try:
+        # デバイス認証
+        device = hub.execute(
+            text("SELECT id, truck_id, tenant_id, device_name, active FROM truck_gps_devices WHERE api_token = :token"),
+            {"token": token}
+        ).fetchone()
+        if not device:
+            return jsonify({"error": "無効なトークンです"}), 401
+        if not device.active:
+            return jsonify({"error": "このデバイスは無効化されています"}), 403
+
+        data = request.get_json(force=True) or {}
+        # 各種GPSデバイスのフィールド名に対応
+        latitude = data.get("latitude") or data.get("lat")
+        longitude = data.get("longitude") or data.get("lng") or data.get("lon")
+        accuracy = data.get("accuracy") or data.get("hdop")
+        speed = data.get("speed")
+        recorded_at_str = data.get("recorded_at") or data.get("timestamp")
+
+        if latitude is None or longitude is None:
+            return jsonify({"error": "latitude/longitudeが必要です"}), 400
+
+        try:
+            latitude = float(latitude)
+            longitude = float(longitude)
+        except (TypeError, ValueError):
+            return jsonify({"error": "latitude/longitudeは数値で指定してください"}), 400
+
+        if recorded_at_str:
+            try:
+                recorded_at = datetime.fromisoformat(str(recorded_at_str).replace("Z", "+00:00")).replace(tzinfo=None)
+            except Exception:
+                recorded_at = datetime.now()
+        else:
+            recorded_at = datetime.now()
+
+        # アクティブな運行を検索（truck_idが紐付いている場合）
+        operation_id = None
+        driver_id = None
+        if device.truck_id:
+            op = hub.execute(
+                text("""
+                    SELECT id, driver_id FROM truck_operations
+                    WHERE truck_id = :truck_id AND status = 'active'
+                    ORDER BY started_at DESC LIMIT 1
+                """),
+                {"truck_id": device.truck_id}
+            ).fetchone()
+            if op:
+                operation_id = op.id
+                driver_id = op.driver_id
+
+        # 位置情報を記録
+        hub.execute(
+            text("""
+                INSERT INTO "T_トラック運行位置履歴"
+                    (operation_id, driver_id, tenant_id, latitude, longitude, accuracy, recorded_at)
+                VALUES
+                    (:operation_id, :driver_id, :tenant_id, :latitude, :longitude, :accuracy, :recorded_at)
+            """),
+            {
+                "operation_id": operation_id,
+                "driver_id": driver_id,
+                "tenant_id": device.tenant_id,
+                "latitude": latitude,
+                "longitude": longitude,
+                "accuracy": float(accuracy) if accuracy else None,
+                "recorded_at": recorded_at,
+            }
+        )
+        # デバイスのlast_seen_atを更新
+        hub.execute(
+            text("UPDATE truck_gps_devices SET last_seen_at = NOW() WHERE id = :id"),
+            {"id": device.id}
+        )
+        hub.commit()
+        return jsonify({"status": "ok", "recorded_at": recorded_at.isoformat()}), 200
+    except Exception as e:
+        hub.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        hub.close()
+
+
+@app.route("/gps_devices", methods=["GET"])
+@login_required
+def gps_devices():
+    """GPSデバイス管理ページ"""
+    hub = get_hub_session()
+    if not hub:
+        flash("DB接続エラー", "error")
+        return redirect(url_for("dashboard"))
+    try:
+        admin_info = hub.execute(
+            text("SELECT tenant_id, role FROM truck_admins WHERE id = :id"),
+            {"id": session.get("admin_id")}
+        ).fetchone()
+        if not admin_info:
+            flash("管理者情報が取得できません", "error")
+            return redirect(url_for("dashboard"))
+        tenant_id = admin_info.tenant_id
+
+        devices = hub.execute(
+            text("""
+                SELECT d.id, d.device_id, d.device_name, d.device_type, d.truck_id,
+                       d.api_token, d.active, d.note, d.last_seen_at, d.created_at,
+                       t.vehicle_number
+                FROM truck_gps_devices d
+                LEFT JOIN trucks t ON t.id = d.truck_id
+                WHERE d.tenant_id = :tenant_id
+                ORDER BY d.created_at DESC
+            """),
+            {"tenant_id": tenant_id}
+        ).fetchall()
+
+        trucks_list = hub.execute(
+            text("SELECT id, vehicle_number, name FROM trucks WHERE tenant_id = :tenant_id ORDER BY vehicle_number"),
+            {"tenant_id": tenant_id}
+        ).fetchall()
+
+        return render_template("admin/gps_devices.html",
+                               devices=devices,
+                               trucks=trucks_list,
+                               tenant_id=tenant_id)
+    finally:
+        hub.close()
+
+
+@app.route("/gps_devices/add", methods=["POST"])
+@login_required
+def gps_device_add():
+    """GPSデバイス追加"""
+    hub = get_hub_session()
+    if not hub:
+        return jsonify({"error": "DB接続エラー"}), 500
+    try:
+        admin_info = hub.execute(
+            text("SELECT tenant_id FROM truck_admins WHERE id = :id"),
+            {"id": session.get("admin_id")}
+        ).fetchone()
+        tenant_id = admin_info.tenant_id
+
+        device_id = request.form.get("device_id", "").strip()
+        device_name = request.form.get("device_name", "").strip()
+        device_type = request.form.get("device_type", "generic").strip()
+        truck_id = request.form.get("truck_id") or None
+        note = request.form.get("note", "").strip()
+
+        if not device_id:
+            flash("デバイスIDは必須です", "error")
+            return redirect(url_for("gps_devices"))
+
+        # 重複チェック
+        existing = hub.execute(
+            text("SELECT id FROM truck_gps_devices WHERE device_id = :device_id"),
+            {"device_id": device_id}
+        ).fetchone()
+        if existing:
+            flash("このデバイスIDは既に登録されています", "error")
+            return redirect(url_for("gps_devices"))
+
+        api_token = _secrets.token_hex(32)
+        hub.execute(
+            text("""
+                INSERT INTO truck_gps_devices
+                    (device_id, device_name, device_type, truck_id, tenant_id, api_token, note)
+                VALUES
+                    (:device_id, :device_name, :device_type, :truck_id, :tenant_id, :api_token, :note)
+            """),
+            {
+                "device_id": device_id,
+                "device_name": device_name or device_id,
+                "device_type": device_type,
+                "truck_id": int(truck_id) if truck_id else None,
+                "tenant_id": tenant_id,
+                "api_token": api_token,
+                "note": note,
+            }
+        )
+        hub.commit()
+        flash(f"デバイスを登録しました。APIトークン: {api_token}", "success")
+        return redirect(url_for("gps_devices"))
+    except Exception as e:
+        hub.rollback()
+        flash(f"エラー: {str(e)}", "error")
+        return redirect(url_for("gps_devices"))
+    finally:
+        hub.close()
+
+
+@app.route("/gps_devices/<int:device_id>/toggle", methods=["POST"])
+@login_required
+def gps_device_toggle(device_id):
+    """デバイスの有効/無効切り替え"""
+    hub = get_hub_session()
+    if not hub:
+        return jsonify({"error": "DB接続エラー"}), 500
+    try:
+        admin_info = hub.execute(
+            text("SELECT tenant_id FROM truck_admins WHERE id = :id"),
+            {"id": session.get("admin_id")}
+        ).fetchone()
+        tenant_id = admin_info.tenant_id
+        hub.execute(
+            text("""
+                UPDATE truck_gps_devices
+                SET active = NOT active, updated_at = NOW()
+                WHERE id = :id AND tenant_id = :tenant_id
+            """),
+            {"id": device_id, "tenant_id": tenant_id}
+        )
+        hub.commit()
+        flash("デバイスの状態を変更しました", "success")
+    except Exception as e:
+        hub.rollback()
+        flash(f"エラー: {str(e)}", "error")
+    finally:
+        hub.close()
+    return redirect(url_for("gps_devices"))
+
+
+@app.route("/gps_devices/<int:device_id>/delete", methods=["POST"])
+@login_required
+def gps_device_delete(device_id):
+    """デバイス削除"""
+    hub = get_hub_session()
+    if not hub:
+        return jsonify({"error": "DB接続エラー"}), 500
+    try:
+        admin_info = hub.execute(
+            text("SELECT tenant_id FROM truck_admins WHERE id = :id"),
+            {"id": session.get("admin_id")}
+        ).fetchone()
+        tenant_id = admin_info.tenant_id
+        hub.execute(
+            text("DELETE FROM truck_gps_devices WHERE id = :id AND tenant_id = :tenant_id"),
+            {"id": device_id, "tenant_id": tenant_id}
+        )
+        hub.commit()
+        flash("デバイスを削除しました", "success")
+    except Exception as e:
+        hub.rollback()
+        flash(f"エラー: {str(e)}", "error")
+    finally:
+        hub.close()
+    return redirect(url_for("gps_devices"))
+
+
+@app.route("/gps_devices/<int:device_id>/regenerate_token", methods=["POST"])
+@login_required
+def gps_device_regenerate_token(device_id):
+    """APIトークン再生成"""
+    hub = get_hub_session()
+    if not hub:
+        return jsonify({"error": "DB接続エラー"}), 500
+    try:
+        admin_info = hub.execute(
+            text("SELECT tenant_id FROM truck_admins WHERE id = :id"),
+            {"id": session.get("admin_id")}
+        ).fetchone()
+        tenant_id = admin_info.tenant_id
+        new_token = _secrets.token_hex(32)
+        hub.execute(
+            text("""
+                UPDATE truck_gps_devices
+                SET api_token = :token, updated_at = NOW()
+                WHERE id = :id AND tenant_id = :tenant_id
+            """),
+            {"token": new_token, "id": device_id, "tenant_id": tenant_id}
+        )
+        hub.commit()
+        flash(f"新しいAPIトークン: {new_token}", "success")
+    except Exception as e:
+        hub.rollback()
+        flash(f"エラー: {str(e)}", "error")
+    finally:
+        hub.close()
+    return redirect(url_for("gps_devices"))

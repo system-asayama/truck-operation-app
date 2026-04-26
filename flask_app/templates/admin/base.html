@@ -3,171 +3,482 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}トラック運行管理{% endblock %}</title>
+  <title>{% block title %}運送会社運営プラットフォーム{% endblock %}</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: #f3f4f6; color: #374151; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: #f0f2f5; color: #374151; }
     a { color: inherit; text-decoration: none; }
 
-    /* トップヘッダー */
+    /* ─── トップバー ─── */
     .topbar {
       position: fixed; top: 0; left: 0; right: 0; height: 56px;
-      background: linear-gradient(90deg, #0f2744 0%, #1a3a5c 100%);
+      background: linear-gradient(90deg, #0b1f3a 0%, #1a3a5c 100%);
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0 16px; z-index: 200; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      padding: 0 16px; z-index: 300; box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+    }
+    .topbar-left { display: flex; align-items: center; gap: 10px; }
+    .topbar-hamburger {
+      display: flex; flex-direction: column; justify-content: center; gap: 5px;
+      width: 32px; height: 32px; cursor: pointer; padding: 4px;
+    }
+    .topbar-hamburger span {
+      display: block; height: 2px; background: rgba(255,255,255,0.85); border-radius: 2px;
+      transition: all 0.25s;
     }
     .topbar-brand { display: flex; align-items: center; gap: 8px; }
-    .topbar-icon { font-size: 24px; }
-    .topbar-title { font-size: 16px; font-weight: 700; color: #fff; }
-    .topbar-user { display: flex; align-items: center; gap: 8px; }
+    .topbar-icon { font-size: 22px; }
+    .topbar-title { font-size: 15px; font-weight: 700; color: #fff; line-height: 1.2; }
+    .topbar-subtitle { font-size: 10px; color: rgba(255,255,255,0.6); font-weight: 400; }
+    .topbar-right { display: flex; align-items: center; gap: 8px; }
     .topbar-avatar {
       width: 32px; height: 32px; border-radius: 50%;
-      background: rgba(255,255,255,0.25); color: #fff;
+      background: rgba(255,255,255,0.2); color: #fff;
       display: flex; align-items: center; justify-content: center;
-      font-size: 13px; font-weight: 700;
+      font-size: 13px; font-weight: 700; border: 1.5px solid rgba(255,255,255,0.35);
     }
     .topbar-username { font-size: 13px; color: rgba(255,255,255,0.85); display: none; }
     .topbar-logout {
-      background: rgba(255,255,255,0.15); color: #fff;
-      border: 1px solid rgba(255,255,255,0.3); border-radius: 6px;
+      background: rgba(255,255,255,0.12); color: #fff;
+      border: 1px solid rgba(255,255,255,0.25); border-radius: 6px;
       padding: 5px 10px; font-size: 12px; cursor: pointer; font-family: inherit;
+      transition: background 0.15s;
+    }
+    .topbar-logout:hover { background: rgba(255,255,255,0.22); }
+
+    /* ─── サイドバー ─── */
+    .sidebar {
+      position: fixed; top: 56px; left: 0; bottom: 0; width: 240px;
+      background: #fff; border-right: 1px solid #e5e7eb;
+      overflow-y: auto; z-index: 250;
+      transform: translateX(-100%); transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+      box-shadow: 2px 0 16px rgba(0,0,0,0.12);
+    }
+    .sidebar.open { transform: translateX(0); }
+    .sidebar-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35);
+      z-index: 240; backdrop-filter: blur(2px);
+    }
+    .sidebar-overlay.open { display: block; }
+
+    /* サイドバー内部 */
+    .sidebar-section { padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
+    .sidebar-section:last-child { border-bottom: none; }
+    .sidebar-category {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 16px 8px;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: #9ca3af;
+      cursor: pointer; user-select: none;
+    }
+    .sidebar-category-icon { font-size: 14px; }
+    .sidebar-category-label { flex: 1; }
+    .sidebar-category-badge {
+      font-size: 9px; background: #e5e7eb; color: #6b7280;
+      padding: 1px 6px; border-radius: 10px; font-weight: 600;
+    }
+    .sidebar-category-arrow { font-size: 10px; transition: transform 0.2s; }
+    .sidebar-category.collapsed .sidebar-category-arrow { transform: rotate(-90deg); }
+    .sidebar-items { overflow: hidden; transition: max-height 0.25s ease; }
+    .sidebar-items.collapsed { max-height: 0 !important; }
+    .sidebar-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 16px 9px 28px;
+      font-size: 13px; color: #4b5563;
+      border-radius: 0; transition: all 0.15s; position: relative;
+    }
+    .sidebar-item:hover { background: #f9fafb; color: #1a3a5c; }
+    .sidebar-item.active {
+      background: #eff6ff; color: #1a3a5c; font-weight: 600;
+    }
+    .sidebar-item.active::before {
+      content: ''; position: absolute; left: 0; top: 4px; bottom: 4px;
+      width: 3px; background: #1a3a5c; border-radius: 0 3px 3px 0;
+    }
+    .sidebar-item-icon { font-size: 15px; width: 20px; text-align: center; }
+    .sidebar-item-label { flex: 1; }
+    .sidebar-item-badge {
+      font-size: 10px; background: #dbeafe; color: #1d4ed8;
+      padding: 1px 7px; border-radius: 10px; font-weight: 600;
     }
 
-    /* ボトムナビ */
+    /* ─── モバイル ボトムナビ ─── */
     .bottom-nav {
       position: fixed; bottom: 0; left: 0; right: 0;
       background: #fff; border-top: 1px solid #e5e7eb;
       display: flex; z-index: 200;
-      box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
+      box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
     }
     .bottom-nav a {
       flex: 1; display: flex; flex-direction: column; align-items: center;
-      padding: 8px 4px 10px; font-size: 10px; color: #9ca3af;
+      padding: 7px 2px 9px; font-size: 9px; color: #9ca3af;
       border-top: 2px solid transparent; transition: all 0.15s;
+      min-width: 0;
     }
     .bottom-nav a.active { color: #1a3a5c; border-top-color: #1a3a5c; }
     .bottom-nav a:hover { color: #1a3a5c; }
-    .bottom-nav .nav-icon { font-size: 20px; margin-bottom: 2px; }
+    .bottom-nav .nav-icon { font-size: 18px; margin-bottom: 2px; }
+    .bottom-nav .nav-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
-    /* メインコンテンツ */
-    .main { padding-top: 56px; padding-bottom: 70px; min-height: 100vh; }
-    .content { padding: 16px; max-width: 900px; margin: 0 auto; }
+    /* ─── メインコンテンツ ─── */
+    .main { padding-top: 56px; padding-bottom: 72px; min-height: 100vh; }
+    .content { padding: 16px; max-width: 960px; margin: 0 auto; }
 
-    /* カード */
-    .card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); margin-bottom: 16px; }
-    .card-title { font-size: 15px; font-weight: 700; color: #0f2744; margin-bottom: 14px; }
+    /* ─── カード ─── */
+    .card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 6px rgba(0,0,0,0.06); margin-bottom: 16px; border: 1px solid #f0f0f0; }
+    .card-title { font-size: 15px; font-weight: 700; color: #0f2744; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
 
-    /* テーブル */
+    /* ─── テーブル ─── */
     .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     table { width: 100%; border-collapse: collapse; min-width: 500px; }
     thead tr { background: #f9fafb; }
     th { padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 600; color: #6b7280; border-bottom: 1px solid #e5e7eb; white-space: nowrap; }
     td { padding: 11px 12px; font-size: 13px; color: #374151; border-bottom: 1px solid #f3f4f6; }
     tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
 
-    /* バッジ */
+    /* ─── バッジ ─── */
     .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; color: #fff; font-size: 11px; font-weight: 600; white-space: nowrap; }
 
-    /* エラー */
-    .error-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px 14px; color: #dc2626; font-size: 13px; margin-bottom: 14px; }
+    /* ─── ページタイトル ─── */
+    .page-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
+    .page-title { font-size: 20px; font-weight: 800; color: #0f2744; margin-bottom: 3px; }
+    .page-subtitle { font-size: 13px; color: #6b7280; }
 
-    /* 空状態 */
-    .empty { text-align: center; padding: 32px; color: #9ca3af; font-size: 13px; }
-
-    /* ページタイトル */
-    .page-title { font-size: 20px; font-weight: 700; color: #0f2744; margin-bottom: 4px; }
-    .page-subtitle { font-size: 13px; color: #6b7280; margin-bottom: 18px; }
-
-    /* ボタン */
+    /* ─── ボタン ─── */
     .btn {
       padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
-      cursor: pointer; border: none; font-family: inherit; display: inline-block;
+      cursor: pointer; border: none; font-family: inherit; display: inline-flex;
+      align-items: center; gap: 6px; transition: all 0.15s;
     }
     .btn-primary { background: #1a3a5c; color: #fff; }
-    .btn-primary:hover { background: #0f2744; }
+    .btn-primary:hover { background: #0f2744; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(26,58,92,0.25); }
     .btn-secondary { background: #f3f4f6; color: #374151; border: 1.5px solid #d1d5db; }
     .btn-secondary:hover { background: #e5e7eb; }
     .btn-danger { background: #fef2f2; color: #dc2626; border: 1.5px solid #fecaca; }
     .btn-danger:hover { background: #fee2e2; }
+    .btn-success { background: #f0fdf4; color: #16a34a; border: 1.5px solid #bbf7d0; }
+    .btn-success:hover { background: #dcfce7; }
     .btn-sm { padding: 5px 10px; font-size: 12px; }
+    .btn-lg { padding: 12px 24px; font-size: 15px; }
 
-    /* フラッシュメッセージ */
-    .flash-success { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 14px; color: #16a34a; font-size: 13px; margin-bottom: 14px; }
-    .flash-error { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px 14px; color: #dc2626; font-size: 13px; margin-bottom: 14px; }
+    /* ─── フラッシュメッセージ ─── */
+    .flash-success { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 14px; color: #16a34a; font-size: 13px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+    .flash-error { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px 14px; color: #dc2626; font-size: 13px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+    .error-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px 14px; color: #dc2626; font-size: 13px; margin-bottom: 14px; }
 
-    /* フォーム */
-    .form-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+    /* ─── 空状態 ─── */
+    .empty { text-align: center; padding: 40px 20px; color: #9ca3af; font-size: 13px; }
+    .empty-icon { font-size: 40px; margin-bottom: 10px; }
+
+    /* ─── フォーム ─── */
+    .form-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 6px rgba(0,0,0,0.06); border: 1px solid #f0f0f0; }
+    .form-section { margin-bottom: 24px; }
+    .form-section-title {
+      font-size: 13px; font-weight: 700; color: #1a3a5c;
+      padding: 8px 12px; background: #eff6ff; border-radius: 6px;
+      margin-bottom: 14px; border-left: 3px solid #1a3a5c;
+    }
     .form-field { margin-bottom: 16px; }
     .form-field label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
-    .form-field input[type=text], .form-field input[type=password], .form-field input[type=number], .form-field textarea, .form-field select {
+    .form-field input[type=text], .form-field input[type=password], .form-field input[type=number],
+    .form-field input[type=date], .form-field input[type=tel], .form-field input[type=email],
+    .form-field textarea, .form-field select {
       width: 100%; padding: 10px 12px; border: 1.5px solid #d1d5db; border-radius: 8px;
-      font-size: 14px; background: #fff; font-family: inherit;
+      font-size: 14px; background: #fff; font-family: inherit; transition: border-color 0.15s;
     }
     .form-field textarea { resize: vertical; min-height: 80px; }
-    .form-field input:focus, .form-field textarea:focus, .form-field select:focus { outline: none; border-color: #1a3a5c; }
-    .form-actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+    .form-field input:focus, .form-field textarea:focus, .form-field select:focus {
+      outline: none; border-color: #1a3a5c; box-shadow: 0 0 0 3px rgba(26,58,92,0.08);
+    }
+    .form-actions { display: flex; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
     .required { color: #dc2626; }
+    .form-hint { font-size: 11px; color: #9ca3af; margin-top: 4px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
-    /* デスクトップ対応 */
-    @media (min-width: 769px) {
+    /* ─── カテゴリバナー ─── */
+    .category-banner {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; border-radius: 8px; margin-bottom: 18px;
+      font-size: 12px; font-weight: 600;
+    }
+    .category-banner.operations { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    .category-banner.masters { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+    .category-banner.finance { background: #fefce8; color: #a16207; border: 1px solid #fde68a; }
+
+    /* ─── デスクトップ対応 ─── */
+    @media (min-width: 900px) {
       .topbar-username { display: block; }
-      .content { padding: 24px 28px; }
-      .card { padding: 20px; }
+      .topbar-hamburger { display: none; }
+      .sidebar {
+        transform: translateX(0) !important;
+        box-shadow: none;
+      }
+      .sidebar-overlay { display: none !important; }
+      .bottom-nav { display: none; }
+      .main { padding-left: 240px; padding-bottom: 24px; }
+      .content { padding: 28px 32px; }
+    }
+
+    @media (min-width: 600px) {
+      .form-row { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 599px) {
+      .form-row { grid-template-columns: 1fr; }
     }
   </style>
   {% block extra_style %}{% endblock %}
 </head>
 <body>
 {% block body %}
-<!-- トップバー -->
+
+<!-- ─── トップバー ─── -->
 <header class="topbar">
-  <div class="topbar-brand">
-    <span class="topbar-icon">🚛</span>
-    <span class="topbar-title">トラック運行管理</span>
+  <div class="topbar-left">
+    <div class="topbar-hamburger" id="hamburgerBtn" onclick="toggleSidebar()">
+      <span></span><span></span><span></span>
+    </div>
+    <div class="topbar-brand">
+      <span class="topbar-icon">🚛</span>
+      <div>
+        <div class="topbar-title">運送会社運営</div>
+        <div class="topbar-subtitle">プラットフォーム</div>
+      </div>
+    </div>
   </div>
-  <div class="topbar-user">
+  <div class="topbar-right">
     <div class="topbar-avatar">{{ session.get('staff_name', '管')[:1] }}</div>
     <span class="topbar-username">{{ session.get('staff_name', '管理者') }}</span>
     <a href="{{ url_for('logout') }}"><button class="topbar-logout">ログアウト</button></a>
   </div>
 </header>
 
-<!-- メインコンテンツ -->
+<!-- ─── サイドバーオーバーレイ ─── -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<!-- ─── サイドバー ─── -->
+<nav class="sidebar" id="sidebar">
+
+  <!-- 運行管理 -->
+  <div class="sidebar-section">
+    <div class="sidebar-category" onclick="toggleCategory('cat-operations')" id="hd-operations">
+      <span class="sidebar-category-icon">🗺️</span>
+      <span class="sidebar-category-label">運行管理</span>
+      <span class="sidebar-category-arrow">▼</span>
+    </div>
+    <div class="sidebar-items" id="cat-operations">
+      <a href="{{ url_for('dashboard') }}" class="sidebar-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+        <span class="sidebar-item-icon">📊</span>
+        <span class="sidebar-item-label">ダッシュボード</span>
+      </a>
+      <a href="{{ url_for('history') }}" class="sidebar-item {% if request.endpoint == 'history' %}active{% endif %}">
+        <span class="sidebar-item-icon">📋</span>
+        <span class="sidebar-item-label">運行履歴</span>
+      </a>
+      <a href="{{ url_for('gps_map') }}" class="sidebar-item {% if request.endpoint in ['gps_map','gps_map_realtime_data'] %}active{% endif %}">
+        <span class="sidebar-item-icon">📍</span>
+        <span class="sidebar-item-label">GPS位置確認</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- マスター登録 -->
+  <div class="sidebar-section">
+    <div class="sidebar-category" onclick="toggleCategory('cat-masters')" id="hd-masters">
+      <span class="sidebar-category-icon">📋</span>
+      <span class="sidebar-category-label">マスター登録</span>
+      <span class="sidebar-category-arrow">▼</span>
+    </div>
+    <div class="sidebar-items" id="cat-masters">
+      <a href="{{ url_for('trucks') }}" class="sidebar-item {% if request.endpoint in ['trucks','truck_new','truck_edit','truck_detail'] %}active{% endif %}">
+        <span class="sidebar-item-icon">🚛</span>
+        <span class="sidebar-item-label">トラック管理</span>
+      </a>
+      <a href="{{ url_for('drivers') }}" class="sidebar-item {% if request.endpoint in ['drivers','driver_new','driver_edit'] %}active{% endif %}">
+        <span class="sidebar-item-icon">👤</span>
+        <span class="sidebar-item-label">ドライバー管理</span>
+      </a>
+      <a href="{{ url_for('routes') }}" class="sidebar-item {% if request.endpoint in ['routes','route_new','route_edit'] %}active{% endif %}">
+        <span class="sidebar-item-icon">🗺️</span>
+        <span class="sidebar-item-label">ルート管理</span>
+      </a>
+      <a href="{{ url_for('customers') }}" class="sidebar-item {% if request.endpoint in ['customers','customer_new','customer_edit','customer_detail','customer_toggle','customer_delete'] %}active{% endif %}">
+        <span class="sidebar-item-icon">🏢</span>
+        <span class="sidebar-item-label">取引先・荷主管理</span>
+      </a>
+      <a href="{{ url_for('contracts') }}" class="sidebar-item {% if request.endpoint in ['contracts','contract_new','contract_edit','contract_detail','contract_file','contract_delete'] %}active{% endif %}">
+        <span class="sidebar-item-icon">📄</span>
+        <span class="sidebar-item-label">契約書管理</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- 財務管理 -->
+  <div class="sidebar-section">
+    <div class="sidebar-category" onclick="toggleCategory('cat-finance')" id="hd-finance">
+      <span class="sidebar-category-icon">💰</span>
+      <span class="sidebar-category-label">財務管理</span>
+      <span class="sidebar-category-badge">準備中</span>
+      <span class="sidebar-category-arrow">▼</span>
+    </div>
+    <div class="sidebar-items" id="cat-finance">
+      <a href="#" class="sidebar-item" style="opacity:0.45;pointer-events:none;">
+        <span class="sidebar-item-icon">🧾</span>
+        <span class="sidebar-item-label">請求書管理</span>
+        <span class="sidebar-item-badge">近日</span>
+      </a>
+      <a href="#" class="sidebar-item" style="opacity:0.45;pointer-events:none;">
+        <span class="sidebar-item-icon">💴</span>
+        <span class="sidebar-item-label">給与計算</span>
+        <span class="sidebar-item-badge">近日</span>
+      </a>
+      <a href="#" class="sidebar-item" style="opacity:0.45;pointer-events:none;">
+        <span class="sidebar-item-icon">⏰</span>
+        <span class="sidebar-item-label">勤怠管理</span>
+        <span class="sidebar-item-badge">近日</span>
+      </a>
+      <a href="#" class="sidebar-item" style="opacity:0.45;pointer-events:none;">
+        <span class="sidebar-item-icon">📈</span>
+        <span class="sidebar-item-label">会計・帳票</span>
+        <span class="sidebar-item-badge">近日</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- システム設定 -->
+  <div class="sidebar-section">
+    <div class="sidebar-category" onclick="toggleCategory('cat-system')" id="hd-system">
+      <span class="sidebar-category-icon">⚙️</span>
+      <span class="sidebar-category-label">システム設定</span>
+      <span class="sidebar-category-arrow">▼</span>
+    </div>
+    <div class="sidebar-items" id="cat-system">
+      <a href="{{ url_for('api_key_settings') }}" class="sidebar-item {% if request.endpoint == 'api_key_settings' %}active{% endif %}">
+        <span class="sidebar-item-icon">🔑</span>
+        <span class="sidebar-item-label">APIキー設定</span>
+      </a>
+      <a href="{{ url_for('apk_settings') }}" class="sidebar-item {% if request.endpoint == 'apk_settings' %}active{% endif %}">
+        <span class="sidebar-item-icon">📱</span>
+        <span class="sidebar-item-label">APK配布設定</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- ドライバーログインへ -->
+  <div class="sidebar-section" style="margin-top:auto;border-top:1px solid var(--border);">
+    <a href="{{ url_for('driver_login') }}" target="_blank"
+       style="display:flex;align-items:center;gap:10px;padding:14px 16px;color:#2563eb;font-weight:600;font-size:0.88rem;text-decoration:none;">
+      <span style="font-size:1.2rem;">👤</span>
+      <span>ドライバーログイン画面へ</span>
+      <span style="margin-left:auto;font-size:0.75rem;opacity:0.6;">↗</span>
+    </a>
+  </div>
+
+</nav>
+
+<!-- ─── メインコンテンツ ─── -->
 <div class="main">
   <div class="content">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for category, message in messages %}
-        <div class="flash-{{ category }}">{{ message }}</div>
+        <div class="flash-{{ category }}">
+          {% if category == 'success' %}✅{% else %}⚠️{% endif %}
+          {{ message }}
+        </div>
       {% endfor %}
     {% endwith %}
     {% block content %}{% endblock %}
   </div>
 </div>
 
-<!-- ボトムナビゲーション -->
-<nav class="bottom-nav">
-  <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">
-    <span class="nav-icon">📊</span>ダッシュボード
-  </a>
-  <a href="{{ url_for('history') }}" class="{% if request.endpoint == 'history' %}active{% endif %}">
-    <span class="nav-icon">📋</span>運行履歴
-  </a>
-  <a href="{{ url_for('trucks') }}" class="{% if request.endpoint in ['trucks','truck_new','truck_edit'] %}active{% endif %}">
-    <span class="nav-icon">🚛</span>トラック
-  </a>
-  <a href="{{ url_for('routes') }}" class="{% if request.endpoint in ['routes','route_new','route_edit'] %}active{% endif %}">
-    <span class="nav-icon">🗺️</span>ルート
-  </a>
-  <a href="{{ url_for('drivers') }}" class="{% if request.endpoint in ['drivers','driver_new','driver_edit'] %}active{% endif %}">
-    <span class="nav-icon">👤</span>ドライバー
-  </a>
-  <a href="{{ url_for('gps_map') }}" class="{% if request.endpoint in ['gps_map','gps_map_realtime_data'] %}active{% endif %}">
-    <span class="nav-icon">📍</span>GPS
-  </a>
-  <a href="{{ url_for('apk_settings') }}" class="{% if request.endpoint == 'apk_settings' %}active{% endif %}">
-    <span class="nav-icon">📱</span>APK
-  </a>
-</nav>
+<!-- ─── モバイル ボトムナビ ─── -->
+<!-- bottom-nav removed -->
+
+<script>
+  // ─── サイドバー開閉 ───
+  function toggleSidebar() {
+    const sb = document.getElementById('sidebar');
+    const ov = document.getElementById('sidebarOverlay');
+    sb.classList.toggle('open');
+    ov.classList.toggle('open');
+  }
+  function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebarOverlay').classList.remove('open');
+  }
+
+  // ─── カテゴリアコーディオン ───
+  function toggleCategory(id) {
+    const items = document.getElementById(id);
+    const hd = document.getElementById('hd-' + id.replace('cat-', ''));
+    items.classList.toggle('collapsed');
+    hd.classList.toggle('collapsed');
+  }
+
+  // ─── 初期状態：現在のページのカテゴリを開く ───
+  (function() {
+    const endpoint = '{{ request.endpoint }}';
+    const operationsPages = ['dashboard', 'history', 'gps_map', 'gps_map_realtime_data'];
+    const mastersPages = ['trucks', 'truck_new', 'truck_edit', 'truck_detail',
+                          'drivers', 'driver_new', 'driver_edit',
+                          'routes', 'route_new', 'route_edit',
+                          'insurance_new', 'insurance_edit', 'insurance_delete',
+                          'maintenance_new', 'maintenance_edit', 'maintenance_delete',
+                          'accident_new', 'accident_edit', 'accident_delete',
+                          'customers', 'customer_new', 'customer_edit', 'customer_detail',
+                          'customer_toggle', 'customer_delete',
+                          'contracts', 'contract_new', 'contract_edit', 'contract_detail',
+                          'contract_file', 'contract_delete'];
+    const systemPages = ['apk_settings', 'api_key_settings'];
+
+    // デフォルトは全て開く。現在のカテゴリ以外は閉じる（モバイルのみ）
+    function isMobile() { return window.innerWidth < 900; }
+    if (isMobile()) {
+      ['cat-operations', 'cat-masters', 'cat-finance', 'cat-system'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.style.maxHeight = el.scrollHeight + 'px';
+          el.classList.add('collapsed');
+          const hd = document.getElementById('hd-' + id.replace('cat-', ''));
+          if (hd) hd.classList.add('collapsed');
+        }
+      });
+      // 現在のカテゴリを開く
+      let activeCat = null;
+      if (operationsPages.includes(endpoint)) activeCat = 'cat-operations';
+      else if (mastersPages.includes(endpoint)) activeCat = 'cat-masters';
+      else if (systemPages.includes(endpoint)) activeCat = 'cat-system';
+      if (activeCat) {
+        const el = document.getElementById(activeCat);
+        if (el) {
+          el.classList.remove('collapsed');
+          const hd = document.getElementById('hd-' + activeCat.replace('cat-', ''));
+          if (hd) hd.classList.remove('collapsed');
+        }
+      }
+    } else {
+      // デスクトップ：全て開く
+      ['cat-operations', 'cat-masters', 'cat-finance', 'cat-system'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.maxHeight = '1000px';
+      });
+    }
+  })();
+
+  // アコーディオン開閉時のmax-height制御
+  function toggleCategory(id) {
+    const items = document.getElementById(id);
+    const hd = document.getElementById('hd-' + id.replace('cat-', ''));
+    if (items.classList.contains('collapsed')) {
+      items.style.maxHeight = items.scrollHeight + 200 + 'px';
+      items.classList.remove('collapsed');
+      if (hd) hd.classList.remove('collapsed');
+    } else {
+      items.style.maxHeight = '0';
+      items.classList.add('collapsed');
+      if (hd) hd.classList.add('collapsed');
+    }
+  }
+</script>
 {% endblock %}
 </body>
 </html>

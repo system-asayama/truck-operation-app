@@ -1,0 +1,179 @@
+{% extends "admin/base.html" %}
+{% block title %}GPSデバイス管理{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>📡 GPSデバイス管理</h1>
+  <p class="subtitle">専用GPSトラッカーデバイスの登録・管理</p>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+{% for category, message in messages %}
+<div class="alert alert-{{ 'success' if category == 'success' else 'error' }}" style="padding:12px 16px;border-radius:8px;margin-bottom:16px;background:{{ '#1a3a2a' if category == 'success' else '#3a1a1a' }};border:1px solid {{ '#22c55e' if category == 'success' else '#ef4444' }};color:{{ '#4ade80' if category == 'success' else '#f87171' }}">
+  {{ message }}
+</div>
+{% endfor %}
+{% endif %}
+{% endwith %}
+
+<!-- デバイス追加フォーム -->
+<div class="card" style="margin-bottom:24px">
+  <h2 style="margin-bottom:16px;font-size:1rem;font-weight:600">新規デバイス登録</h2>
+  <form method="POST" action="/gps_devices/add">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div>
+        <label style="display:block;font-size:0.75rem;color:var(--color-muted);margin-bottom:4px">デバイスID <span style="color:#ef4444">*</span></label>
+        <input type="text" name="device_id" required placeholder="例: FMB920-001" class="form-input" style="width:100%;padding:8px 12px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:6px;color:var(--color-text)">
+      </div>
+      <div>
+        <label style="display:block;font-size:0.75rem;color:var(--color-muted);margin-bottom:4px">デバイス名</label>
+        <input type="text" name="device_name" placeholder="例: 1号車GPSトラッカー" class="form-input" style="width:100%;padding:8px 12px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:6px;color:var(--color-text)">
+      </div>
+      <div>
+        <label style="display:block;font-size:0.75rem;color:var(--color-muted);margin-bottom:4px">デバイス種別</label>
+        <select name="device_type" style="width:100%;padding:8px 12px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:6px;color:var(--color-text)">
+          <option value="generic">汎用GPSトラッカー</option>
+          <option value="teltonika">Teltonika</option>
+          <option value="queclink">Queclink</option>
+          <option value="concox">Concox</option>
+          <option value="other">その他</option>
+        </select>
+      </div>
+      <div>
+        <label style="display:block;font-size:0.75rem;color:var(--color-muted);margin-bottom:4px">紐付けトラック</label>
+        <select name="truck_id" style="width:100%;padding:8px 12px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:6px;color:var(--color-text)">
+          <option value="">-- 未割当 --</option>
+          {% for truck in trucks %}
+          <option value="{{ truck.id }}">{{ truck.vehicle_number }}{% if truck.name %} ({{ truck.name }}){% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="display:block;font-size:0.75rem;color:var(--color-muted);margin-bottom:4px">メモ</label>
+      <input type="text" name="note" placeholder="設置場所・備考など" style="width:100%;padding:8px 12px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:6px;color:var(--color-text)">
+    </div>
+    <button type="submit" class="btn btn-primary">デバイスを登録</button>
+  </form>
+</div>
+
+<!-- API仕様 -->
+<div class="card" style="margin-bottom:24px;background:var(--color-surface)">
+  <h2 style="margin-bottom:12px;font-size:0.9rem;font-weight:600">📋 デバイス設定方法（API仕様）</h2>
+  <p style="font-size:0.8rem;color:var(--color-muted);margin-bottom:8px">GPSデバイスから以下のエンドポイントにHTTP POSTで位置情報を送信してください。</p>
+  <div style="background:#0d1117;border-radius:6px;padding:12px;font-family:monospace;font-size:0.8rem;color:#e6edf3">
+    <div style="color:#79c0ff">POST</div>
+    <div>https://truck.samurai-hub.com/api/gps_device/location</div>
+    <br>
+    <div style="color:#79c0ff">Headers:</div>
+    <div>Authorization: Bearer <span style="color:#ffa657">{APIトークン}</span></div>
+    <div>Content-Type: application/json</div>
+    <br>
+    <div style="color:#79c0ff">Body (JSON):</div>
+    <div>{</div>
+    <div>&nbsp;&nbsp;"latitude": <span style="color:#ffa657">35.6762</span>,</div>
+    <div>&nbsp;&nbsp;"longitude": <span style="color:#ffa657">139.6503</span>,</div>
+    <div>&nbsp;&nbsp;"accuracy": <span style="color:#ffa657">5.0</span>,&nbsp;&nbsp;<span style="color:#8b949e">// 任意</span></div>
+    <div>&nbsp;&nbsp;"speed": <span style="color:#ffa657">60.0</span>,&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#8b949e">// 任意 (km/h)</span></div>
+    <div>&nbsp;&nbsp;"recorded_at": <span style="color:#ffa657">"2026-04-26T10:00:00Z"</span>&nbsp;<span style="color:#8b949e">// 任意</span></div>
+    <div>}</div>
+  </div>
+  <p style="font-size:0.75rem;color:var(--color-muted);margin-top:8px">
+    ※ Teltonika形式（lat/lng）、Queclink形式も自動対応しています。<br>
+    ※ 送信間隔は30秒〜1分を推奨します（通信量削減のため）。
+  </p>
+</div>
+
+<!-- デバイス一覧 -->
+<div class="card">
+  <h2 style="margin-bottom:16px;font-size:1rem;font-weight:600">登録済みデバイス ({{ devices|length }}台)</h2>
+  {% if devices %}
+  <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:0.85rem">
+      <thead>
+        <tr style="border-bottom:1px solid var(--color-border)">
+          <th style="text-align:left;padding:8px 12px;color:var(--color-muted);font-weight:500">デバイス名</th>
+          <th style="text-align:left;padding:8px 12px;color:var(--color-muted);font-weight:500">種別</th>
+          <th style="text-align:left;padding:8px 12px;color:var(--color-muted);font-weight:500">紐付けトラック</th>
+          <th style="text-align:left;padding:8px 12px;color:var(--color-muted);font-weight:500">APIトークン</th>
+          <th style="text-align:left;padding:8px 12px;color:var(--color-muted);font-weight:500">最終受信</th>
+          <th style="text-align:left;padding:8px 12px;color:var(--color-muted);font-weight:500">状態</th>
+          <th style="text-align:left;padding:8px 12px;color:var(--color-muted);font-weight:500">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for device in devices %}
+        <tr style="border-bottom:1px solid var(--color-border)">
+          <td style="padding:10px 12px">
+            <div style="font-weight:500">{{ device.device_name }}</div>
+            <div style="font-size:0.75rem;color:var(--color-muted)">ID: {{ device.device_id }}</div>
+          </td>
+          <td style="padding:10px 12px;color:var(--color-muted)">{{ device.device_type }}</td>
+          <td style="padding:10px 12px">
+            {% if device.vehicle_number %}
+            <span style="background:var(--color-surface);padding:2px 8px;border-radius:4px;font-size:0.8rem">{{ device.vehicle_number }}</span>
+            {% else %}
+            <span style="color:var(--color-muted);font-size:0.8rem">未割当</span>
+            {% endif %}
+          </td>
+          <td style="padding:10px 12px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <code style="font-size:0.7rem;background:#0d1117;padding:3px 6px;border-radius:4px;color:#79c0ff;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ device.api_token }}</code>
+              <button onclick="copyToken('{{ device.api_token }}')" style="background:none;border:none;cursor:pointer;color:var(--color-muted);font-size:0.75rem;padding:2px 6px;border:1px solid var(--color-border);border-radius:4px">コピー</button>
+            </div>
+          </td>
+          <td style="padding:10px 12px;color:var(--color-muted);font-size:0.8rem">
+            {% if device.last_seen_at %}
+            {{ device.last_seen_at.strftime('%m/%d %H:%M') }}
+            {% else %}
+            <span style="color:#6b7280">未受信</span>
+            {% endif %}
+          </td>
+          <td style="padding:10px 12px">
+            {% if device.active %}
+            <span style="background:#1a3a2a;color:#4ade80;padding:2px 8px;border-radius:12px;font-size:0.75rem">有効</span>
+            {% else %}
+            <span style="background:#3a1a1a;color:#f87171;padding:2px 8px;border-radius:12px;font-size:0.75rem">無効</span>
+            {% endif %}
+          </td>
+          <td style="padding:10px 12px">
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <form method="POST" action="/gps_devices/{{ device.id }}/toggle" style="display:inline">
+                <button type="submit" style="font-size:0.75rem;padding:4px 8px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:4px;cursor:pointer;color:var(--color-text)">
+                  {{ '無効化' if device.active else '有効化' }}
+                </button>
+              </form>
+              <form method="POST" action="/gps_devices/{{ device.id }}/regenerate_token" style="display:inline">
+                <button type="submit" onclick="return confirm('トークンを再生成しますか？既存の設定は更新が必要になります。')" style="font-size:0.75rem;padding:4px 8px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:4px;cursor:pointer;color:var(--color-text)">
+                  トークン再生成
+                </button>
+              </form>
+              <form method="POST" action="/gps_devices/{{ device.id }}/delete" style="display:inline">
+                <button type="submit" onclick="return confirm('このデバイスを削除しますか？')" style="font-size:0.75rem;padding:4px 8px;background:#3a1a1a;border:1px solid #ef4444;border-radius:4px;cursor:pointer;color:#f87171">
+                  削除
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:40px;color:var(--color-muted)">
+    <div style="font-size:2rem;margin-bottom:8px">📡</div>
+    <p>登録済みのGPSデバイスはありません</p>
+    <p style="font-size:0.8rem">上のフォームからデバイスを登録してください</p>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function copyToken(token) {
+  navigator.clipboard.writeText(token).then(() => {
+    alert('APIトークンをコピーしました');
+  });
+}
+</script>
+{% endblock %}
