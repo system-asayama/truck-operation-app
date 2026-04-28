@@ -32,6 +32,7 @@ import {
   startOperation,
   updateOperationStatus,
   getGpsSentCount,
+  refreshConfig,
   type TruckDriverInfo,
   type Truck,
   type Route,
@@ -196,7 +197,7 @@ export default function OperationScreen() {
     setCurrentSpeedKmh(null);
   }, []);
 
-  const startGpsTracking = useCallback(async (operationId: number) => {
+  const startGpsTracking = useCallback(async (operationId: number, driverInfoOverride?: TruckDriverInfo) => {
     if (Platform.OS === "web" || !isBackgroundTaskAvailable) return;
     try {
       const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
@@ -211,8 +212,9 @@ export default function OperationScreen() {
         Alert.alert("バックグラウンド位置情報", "バックグラウンドでの位置情報追跡が許可されていません。設定から「常に許可」に変更してください。");
       }
       await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_OPERATION_ID, String(operationId));
-      // GPS間隔をサーバー設定から取得（デフォルト30秒）
-      const gpsIntervalSec = driverInfo?.gpsIntervalSeconds ?? 30;
+      // GPS間隔をサーバー設定から取得（デフォルト30秒）。overrideがあればそちらを優先
+      const effectiveDriverInfo = driverInfoOverride ?? driverInfo;
+      const gpsIntervalSec = effectiveDriverInfo?.gpsIntervalSeconds ?? 30;
       const gpsIntervalMs = gpsIntervalSec * 1000;
       // 間隔に応じて精度を自動調整（従業員勤怠GPSと同じロジック）
       let accuracy: Location.Accuracy;
@@ -293,12 +295,18 @@ export default function OperationScreen() {
     if (!driverInfo || !selectedTruck) return;
     setActionLoading(true);
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const result = await startOperation(driverInfo, {
+    // 運行開始前にサーバーから最新のGPS間隔設定を取得してdriverInfoを更新
+    const configResult = await refreshConfig(driverInfo);
+    const latestDriverInfo = configResult.ok && configResult.gpsIntervalSeconds !== undefined
+      ? { ...driverInfo, gpsIntervalSeconds: configResult.gpsIntervalSeconds }
+      : driverInfo;
+    setDriverInfo(latestDriverInfo);
+    const result = await startOperation(latestDriverInfo, {
       truckId: selectedTruck.id,
       routeId: route?.id,
     });
     if (result.ok && result.operationId) {
-      await startGpsTracking(result.operationId);
+      await startGpsTracking(result.operationId, latestDriverInfo);
       await loadData();
       if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert("運行開始", `${selectedTruck.truckName}（${selectedTruck.truckNumber}）で運行を開始しました。`);

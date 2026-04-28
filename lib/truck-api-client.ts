@@ -412,3 +412,45 @@ export async function getGpsSentCount(
   if (!result.ok) return { ok: false, error: result.error };
   return { ok: true, count: result.data?.count ?? 0 };
 }
+
+/**
+ * サーバーから最新のアプリ設定（GPS間隔など）を取得してdriverInfoを更新する
+ */
+export async function refreshConfig(
+  info: TruckDriverInfo
+): Promise<{ ok: boolean; gpsIntervalSeconds?: number; error?: string }> {
+  const result = await truckApiRequest<{ gps_interval_seconds: number }>(
+    info.apiUrl,
+    info.staffToken,
+    info.mobileApiKey,
+    `/config`,
+    "GET"
+  );
+  if (!result.ok) return { ok: false, error: result.error };
+  const gpsIntervalSeconds = result.data?.gps_interval_seconds ?? info.gpsIntervalSeconds;
+  // driverInfoを更新して保存
+  const updatedInfo: TruckDriverInfo = { ...info, gpsIntervalSeconds };
+  await saveTruckDriverInfo(updatedInfo);
+  return { ok: true, gpsIntervalSeconds };
+}
+
+/**
+ * サーバーから最新のアプリ設定（GPS間隔など）を取得してdriverInfoを更新する
+ */
+export async function refreshConfig(
+  info: TruckDriverInfo
+): Promise<{ ok: boolean; gpsIntervalSeconds?: number; error?: string }> {
+  const result = await truckApiRequest<{ gps_interval_seconds: number }>(
+    info.apiUrl,
+    info.staffToken,
+    info.mobileApiKey,
+    `/config`,
+    "GET"
+  );
+  if (!result.ok) return { ok: false, error: result.error };
+  const gpsIntervalSeconds = result.data?.gps_interval_seconds ?? info.gpsIntervalSeconds;
+  // driverInfoを更新して保存
+  const updatedInfo: TruckDriverInfo = { ...info, gpsIntervalSeconds };
+  await saveTruckDriverInfo(updatedInfo);
+  return { ok: true, gpsIntervalSeconds };
+}
