@@ -78,6 +78,13 @@ const MAPPING = {
   // Download / Update
   "arrow.down.circle.fill": "download",
   "arrow.down.circle": "download",
+  // Photo / Comment
+  "photo.fill": "photo-library",
+  "photo": "photo-library",
+  "photo.badge.plus": "add-a-photo",
+  "trash.fill": "delete",
+  "pencil": "edit",
+  "text.bubble.fill": "chat",
 } as unknown as IconMapping;
 
 /**

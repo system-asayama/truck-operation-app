@@ -435,22 +435,76 @@ export async function refreshConfig(
 }
 
 /**
- * サーバーから最新のアプリ設定（GPS間隔など）を取得してdriverInfoを更新する
+ * 運行写真をアップロードする（multipart/form-data）
  */
-export async function refreshConfig(
-  info: TruckDriverInfo
-): Promise<{ ok: boolean; gpsIntervalSeconds?: number; error?: string }> {
-  const result = await truckApiRequest<{ gps_interval_seconds: number }>(
+export async function uploadOperationPhoto(
+  info: TruckDriverInfo,
+  params: {
+    operationId: number;
+    photoUri: string;
+    comment?: string;
+  }
+): Promise<{ ok: boolean; photoUrl?: string; error?: string }> {
+  try {
+    const formData = new FormData();
+    formData.append('operation_id', String(params.operationId));
+    if (params.comment) {
+      formData.append('comment', params.comment);
+    }
+    // React Native の FormData は uri/name/type 形式でファイルを追加
+    const filename = params.photoUri.split('/').pop() ?? 'photo.jpg';
+    const ext = filename.split('.').pop()?.toLowerCase() ?? 'jpg';
+    const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg';
+    formData.append('file', {
+      uri: params.photoUri,
+      name: filename,
+      type: mimeType,
+    } as unknown as Blob);
+
+    const response = await fetch(`${info.apiUrl}/truck/api/mobile/photo/upload`, {
+      method: 'POST',
+      headers: {
+        'X-Mobile-API-Key': info.mobileApiKey,
+        'X-Staff-Token': info.staffToken,
+        // Content-Type は fetch が自動設定（multipart/form-data + boundary）
+      },
+      body: formData,
+    });
+    const data = await response.json();
+    if (!data.ok) return { ok: false, error: data.error ?? 'アップロード失敗' };
+    return { ok: true, photoUrl: data.photo_url };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
+/**
+ * 運行写真一覧を取得する
+ */
+export interface OperationPhoto {
+  id: number;
+  photoUrl: string;
+  comment: string | null;
+  takenAt: string | null;
+}
+
+export async function getOperationPhotos(
+  info: TruckDriverInfo,
+  operationId: number
+): Promise<{ ok: boolean; photos?: OperationPhoto[]; error?: string }> {
+  const result = await truckApiRequest<{ photos: Array<{ id: number; photo_url: string; comment: string | null; taken_at: string | null }> }>(
     info.apiUrl,
     info.staffToken,
     info.mobileApiKey,
-    `/config`,
-    "GET"
+    `/photo/list?operation_id=${operationId}`,
+    'GET'
   );
   if (!result.ok) return { ok: false, error: result.error };
-  const gpsIntervalSeconds = result.data?.gps_interval_seconds ?? info.gpsIntervalSeconds;
-  // driverInfoを更新して保存
-  const updatedInfo: TruckDriverInfo = { ...info, gpsIntervalSeconds };
-  await saveTruckDriverInfo(updatedInfo);
-  return { ok: true, gpsIntervalSeconds };
+  const photos: OperationPhoto[] = (result.data?.photos ?? []).map((p) => ({
+    id: p.id,
+    photoUrl: p.photo_url,
+    comment: p.comment,
+    takenAt: p.taken_at,
+  }));
+  return { ok: true, photos };
 }

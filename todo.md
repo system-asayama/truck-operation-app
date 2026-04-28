@@ -31,3 +31,14 @@
 
 - [ ] チェックポイント保存
 - [ ] GitHubへのプッシュ
+
+## 写真撮影・コメント機能
+- [ ] サーバー側: truck_operation_photosテーブル追加（DBマイグレーション）
+- [ ] サーバー側: /api/mobile/photo/upload エンドポイント追加（multipart/form-data）
+- [ ] サーバー側: /api/mobile/photo/list エンドポイント追加（operation_id別一覧）
+- [ ] アプリ側: expo-cameraをapp.config.tsに追加（パーミッション設定）
+- [ ] アプリ側: icon-symbol.tsxにphoto関連アイコン追加
+- [ ] アプリ側: components/photo-capture-modal.tsx 作成（カメラ撮影・コメント入力・アップロード）
+- [ ] アプリ側: lib/truck-api-client.tsにuploadPhoto/getPhotos関数追加
+- [ ] アプリ側: 運行画面（index.tsx）に「写真撮影」ボタン追加（運行中のみ表示）
+- [ ] アプリ側: 運行画面に撮影済み写真のサムネイル一覧表示

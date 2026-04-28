@@ -23,6 +23,7 @@ import { Platform } from "react-native";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { PhotoCaptureModal } from "@/components/photo-capture-modal";
 import { useColors } from "@/hooks/use-colors";
 import {
   getTruckDriverInfo,
@@ -39,6 +40,7 @@ import {
   type TruckOperation,
   type OperationStatus,
   TRUCK_STORAGE_KEYS,
+  DEFAULT_API_URL,
 } from "@/lib/truck-api-client";
 import {
   BACKGROUND_LOCATION_TASK,
@@ -81,6 +83,8 @@ export default function OperationScreen() {
   const [loadingTrucks, setLoadingTrucks] = useState(false);
   const [loadingRoutes, setLoadingRoutes] = useState(false);
   const [gpsSentCount, setGpsSentCount] = useState(0);
+  // 写真撮影モーダル
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
   // 速度関連
   const [currentSpeedKmh, setCurrentSpeedKmh] = useState<number | null>(null);
   const locationSubscriptionRef = useRef<Location.LocationSubscription | null>(null);
@@ -587,6 +591,18 @@ export default function OperationScreen() {
                 </View>
               </View>
             )}
+            {currentStatus !== "off" && currentStatus !== "finished" && operation && driverInfo && (
+              <TouchableOpacity
+                style={[styles.photoButton, { backgroundColor: "#1a3a5c", borderColor: "#2a5a8c" }]}
+                onPress={() => {
+                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setShowPhotoModal(true);
+                }}
+              >
+                <IconSymbol name="photo.badge.plus" size={24} color="#ffffff" />
+                <Text style={styles.photoButtonText}>写真を撮る</Text>
+              </TouchableOpacity>
+            )}
           </>
         )}
       </ScrollView>
@@ -671,6 +687,17 @@ export default function OperationScreen() {
           )}
         </View>
       </Modal>
+
+      {/* 写真撮影モーダル */}
+      {showPhotoModal && operation && driverInfo && (
+        <PhotoCaptureModal
+          visible={showPhotoModal}
+          onClose={() => setShowPhotoModal(false)}
+          driverInfo={driverInfo}
+          operationId={operation.id}
+          apiBaseUrl={driverInfo.apiUrl || DEFAULT_API_URL}
+        />
+      )}
     </ScreenContainer>
   );
 }
@@ -732,4 +759,19 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: "center", padding: 40, gap: 8 },
   emptyText: { fontSize: 16, fontWeight: "600" },
   emptySubText: { fontSize: 13, textAlign: "center" },
+  photoButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  photoButtonText: { color: "#ffffff", fontSize: 16, fontWeight: "700" },
 });

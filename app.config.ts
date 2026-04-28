@@ -96,7 +96,7 @@ const config: ExpoConfig = {
     [
       "expo-camera",
       {
-        "cameraPermission": "QRコードをスキャンするためにカメラへのアクセスを許可してください。"
+        "cameraPermission": "運行中の写真撮影およびQRコードスキャンのためにカメラへのアクセスを許可してください。"
       }
     ],
     [
