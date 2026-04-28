@@ -656,6 +656,17 @@ def driver_delete(driver_id):
     return redirect(url_for("drivers"))
 
 
+@app.route("/drivers/<int:driver_id>/destroy", methods=["POST"])
+@login_required
+def driver_destroy(driver_id):
+    driver = Driver.query.get_or_404(driver_id)
+    name = driver.name
+    db.session.delete(driver)
+    db.session.commit()
+    flash(f"ドライバー「{name}」を削除しました", "success")
+    return redirect(url_for("drivers"))
+
+
 # ─── モバイルAPI（ドライバーアプリ向け）────────────────────
 
 @app.route("/api/mobile/auth/login", methods=["POST"])
